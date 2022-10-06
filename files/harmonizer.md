@@ -1,0 +1,33 @@
+### harmonizer
+- Use Cases
+  - User imports midi file and performs chord analysis on the song
+  - Load a file from anywhere on computer
+  - Handle changing midi file at anytime
+    - confirmation?
+  - User could open the program, find a midi file, import it to the program, and play along in time with the song on another instrument
+  - User could open the program, find a midi file, import it, and view all of the unique chords in that song.
+  - User could open the program, find a midi file, import it, and play the midi file.
+  - User could open the program, find a midi file, import it, and play the midi file and watch the chords playing
+- Components
+  - Display
+    - jFrame
+      - Display
+      - ChordDisplay
+  - Chord
+    - analyze
+    - stack containing Notes
+      - from bottom to top?
+    - checks key?
+  - Note
+    - analyze
+      - determine if it is a #/b by key?
+        - then determine note name
+  - Song
+    - midiReader
+    - analyze
+      - key
+      - time signature
+      - tempo
+    - stack containing Chords
+      - from last to first?
+  - Timer
