@@ -1,105 +1,95 @@
 package harmonizer.ui;
 
+import java.util.function.BiConsumer;
+
 import harmonizer.model.Song;
+import javafx.collections.FXCollections;
+import javafx.geometry.Insets;
+import javafx.scene.control.ButtonType;
+import javafx.scene.control.ComboBox;
+import javafx.scene.control.Dialog;
+import javafx.scene.control.Label;
+import javafx.scene.control.Separator;
+import javafx.scene.layout.GridPane;
+import javafx.stage.Window;
 
-import java.awt.FlowLayout;
-import java.awt.event.ActionEvent;
+public final class EditChordWindow {
+	private static final String[] SHARP_ROOTS = {
+			"C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"
+	};
+	private static final String[] FLAT_ROOTS = {
+			"C", "Db", "D", "Eb", "E", "F", "Gb", "G", "Ab", "A", "Bb", "B"
+	};
+	private static final String[] TYPES = {
+			"maj", "min", "maj(m7)", "maj(M7)", "min(m7)", "min(M7)"
+	};
 
-import javax.swing.AbstractAction;
-import javax.swing.BoxLayout;
-import javax.swing.JButton;
-import javax.swing.JComboBox;
-import javax.swing.JFrame;
-import javax.swing.JLabel;
-import javax.swing.JPanel;
-import java.util.function.Consumer;
-
-public class EditChordWindow  { 
-		
-		private String currentChord;
-		private String oldChords;
-		private Song song;
-		private Consumer<String> chordEdited;
-		private long currentTick;
-		private long prevTick;
-		private JComboBox<String> listRoot;
-		private JComboBox<String> listType;
-		private String currentRoot;
-		private String currentType;
-		private JFrame jf;
-		private String prevChord;
-		private static final String[] noteNamesSharp = {
-				"C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"
-		};
-		private static final String[] noteNamesFlat = {
-				"C", "Db", "D", "Eb", "E", "F", "Gb", "G", "Ab", "A", "Bb", "B"
-		};
-		public EditChordWindow(long currentTick, Song song, String oldChords, Consumer<String> chordEdited) {
-			this.song = song;
-			this.chordEdited = chordEdited;
-			this.currentTick = this.song.getChordTickAt(currentTick);
-			this.prevTick = this.song.getPrevTick(this.currentTick);
-			this.prevChord = null;
-			if (prevTick != -1) this.prevChord = this.song.getMap().get(this.prevTick).getName();
-			this.currentChord = this.song.getMap().get(this.currentTick).getName();
-			this.oldChords = oldChords;
-			this.currentRoot = this.currentChord.split("m")[0];
-			this.currentType = this.currentChord.substring(this.currentRoot.length(), this.currentChord.length());
-			drawWindow();
-			
-		}
-		public void drawWindow() {
-			jf = new JFrame("Edit Chord WIndow");
-			JPanel panelMain = new JPanel();
-			panelMain.setLayout(new BoxLayout(panelMain, BoxLayout.PAGE_AXIS));
-			jf.add(panelMain);
-			jf.setSize(400, 200);
-			jf.setVisible(true);
-			jf.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
-			
-			JPanel jp0 = new JPanel(new FlowLayout());
-			JLabel jb1 = new JLabel("Current Chord: ");
-			JLabel jb = new JLabel(this.currentChord);
-			
-			jp0.add(jb1);
-			jp0.add(jb);		
-
-			
-			JPanel jp2 = new JPanel();
-			listRoot = new JComboBox<String>(this.song.isFlatKey() ? noteNamesFlat : noteNamesSharp);
-			listRoot.setSelectedItem(this.currentRoot);
-			JLabel labelRoot = new JLabel("Root:");
-			String[] listTypes = new String[] {"maj", "min", "maj(m7)", "maj(M7)", "min(m7)", "min(M7)"};
-			listType = new JComboBox<String>(listTypes);
-			listType.setSelectedItem(this.currentType);
-			JLabel labelType = new JLabel("Type:");
-			
-			jp2.add(labelRoot);
-			jp2.add(listRoot);
-			jp2.add(labelType);
-			jp2.add(listType);
-		
-			
-			JPanel jp4 = new JPanel();
-			JButton accept = new JButton("Accept");
-			accept.setAction(new AbstractAction("Accept") {
-				public void actionPerformed(ActionEvent ae) {
-					editChords();
-				}
-			});
-			jp4.add(accept);
-			panelMain.add(jp0);
-			panelMain.add(jp2);
-			panelMain.add(jp4);
-			jf.setVisible(true);
-		}
-	
-		public void editChords() {
-			String oldChords = this.oldChords;
-			String newChords = (String) this.listRoot.getSelectedItem() + this.listType.getSelectedItem() + " " + oldChords.split(" ")[1];
-			String prevChords = this.prevChord + " " + this.listRoot.getSelectedItem() + this.listType.getSelectedItem();
-			this.song.editChord(currentTick, newChords, oldChords, prevTick, this.prevChord + " " + currentChord, prevChords);
-			chordEdited.accept(newChords);
-			jf.dispose();
-		}
+	private EditChordWindow() {
 	}
+
+	public static void show(Window owner, Song song, long tick, String chordText,
+			BiConsumer<String, Long> chordEdited) {
+		if (song.getMap().isEmpty()) {
+			return;
+		}
+		long chordTick = song.getMap().containsKey(tick) ? tick : song.getFirstTick();
+		if (chordTick < 0 || !song.getMap().containsKey(chordTick)) {
+			return;
+		}
+
+		String currentChord = song.getMap().get(chordTick).getName();
+		long previousTick = song.getPrevTick(chordTick);
+		String previousChord = previousTick < 0 ? null : song.getMap().get(previousTick).getName();
+		String[] roots = song.isFlatKey() ? FLAT_ROOTS : SHARP_ROOTS;
+		String[] oldPair = chordText.split(" ", 2);
+		String currentType = chordType(currentChord);
+		if (currentType.isEmpty()) {
+			return;
+		}
+		String currentRoot = currentChord.substring(0, currentChord.length() - currentType.length());
+
+		ComboBox<String> rootChoice = new ComboBox<>(FXCollections.observableArrayList(roots));
+		rootChoice.setValue(currentRoot);
+		ComboBox<String> typeChoice = new ComboBox<>(FXCollections.observableArrayList(TYPES));
+		typeChoice.setValue(currentType);
+
+		GridPane form = new GridPane();
+		form.setHgap(12);
+		form.setVgap(12);
+		form.setPadding(new Insets(18));
+		form.add(new Label("Current chord"), 0, 0);
+		form.add(new Label(currentChord), 1, 0);
+		form.add(new Separator(), 0, 1, 2, 1);
+		form.add(new Label("Root"), 0, 2);
+		form.add(rootChoice, 1, 2);
+		form.add(new Label("Quality"), 0, 3);
+		form.add(typeChoice, 1, 3);
+
+		Dialog<ButtonType> dialog = new Dialog<>();
+		dialog.initOwner(owner);
+		dialog.setTitle("Edit chord");
+		dialog.setHeaderText("Change chord at tick " + chordTick);
+		dialog.getDialogPane().setContent(form);
+		dialog.getDialogPane().getButtonTypes().addAll(ButtonType.CANCEL, ButtonType.APPLY);
+		dialog.showAndWait().filter(ButtonType.APPLY::equals).ifPresent(result -> {
+			String editedChord = rootChoice.getValue() + typeChoice.getValue();
+			String nextChord = oldPair.length > 1 ? oldPair[1] : "";
+			String newChordText = editedChord + " " + nextChord;
+			String oldChordText = currentChord + " " + nextChord;
+			String previousOldText = previousChord + " " + currentChord;
+			String previousNewText = previousChord + " " + editedChord;
+			song.editChord(chordTick, newChordText, oldChordText, previousTick,
+					previousOldText, previousNewText);
+			chordEdited.accept(newChordText, chordTick);
+		});
+	}
+
+	private static String chordType(String chord) {
+		for (String type : TYPES) {
+			if (chord.endsWith(type)) {
+				return type;
+			}
+		}
+		return "";
+	}
+}

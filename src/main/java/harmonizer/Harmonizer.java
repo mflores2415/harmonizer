@@ -1,14 +1,12 @@
 package harmonizer;
 
-import java.awt.EventQueue;
-
-import harmonizer.controller.HarmonizerController;
+import javafx.application.Application;
 
 public final class Harmonizer {
 	private Harmonizer() {
 	}
 
 	public static void main(String[] args) {
-		EventQueue.invokeLater(() -> new HarmonizerController().show());
+		Application.launch(HarmonizerApplication.class, args);
 	}
 }

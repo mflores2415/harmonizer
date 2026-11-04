@@ -1,0 +1,93 @@
+.root {
+    -fx-font-family: "Segoe UI", "Arial", sans-serif;
+    -fx-font-size: 13px;
+    -fx-background-color: #f5f7fa;
+}
+
+.app-root {
+    -fx-background-color: #f5f7fa;
+}
+
+.app-title {
+    -fx-font-size: 21px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #1c365d;
+}
+
+.song-title {
+    -fx-font-size: 14px;
+    -fx-text-fill: #56657a;
+}
+
+.primary-button {
+    -fx-background-color: #245c9a;
+    -fx-text-fill: white;
+    -fx-font-weight: bold;
+    -fx-background-radius: 6px;
+    -fx-padding: 9px 16px;
+}
+
+.primary-button:hover {
+    -fx-background-color: #194879;
+}
+
+.empty-card, .info-card, .chord-card, .player-panel {
+    -fx-background-color: white;
+    -fx-background-radius: 10px;
+    -fx-border-color: #dce3ec;
+    -fx-border-radius: 10px;
+}
+
+.empty-heading, .dialog-title {
+    -fx-font-size: 23px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #233b5d;
+}
+
+.subtle-text, .chord-heading, .info-heading, .section-title {
+    -fx-text-fill: #69788c;
+}
+
+.current-card {
+    -fx-background-color: #edf4fd;
+}
+
+.next-card {
+    -fx-background-color: #ffffff;
+}
+
+.chord-heading, .section-title {
+    -fx-font-size: 11px;
+    -fx-font-weight: bold;
+}
+
+.current-chord {
+    -fx-font-size: 40px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #1c365d;
+}
+
+.next-chord {
+    -fx-font-size: 32px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #52647c;
+}
+
+.player-panel {
+    -fx-background-radius: 0;
+    -fx-border-radius: 0;
+    -fx-border-width: 1px 0 0 0;
+}
+
+.time-label {
+    -fx-font-family: monospace;
+    -fx-text-fill: #536174;
+}
+
+.chord-chip {
+    -fx-background-color: #edf4fd;
+    -fx-background-radius: 16px;
+    -fx-padding: 8px 14px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #244a78;
+}

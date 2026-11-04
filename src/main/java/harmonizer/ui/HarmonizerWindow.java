@@ -1,28 +1,26 @@
 package harmonizer.ui;
 
-import java.awt.BorderLayout;
-import java.awt.CardLayout;
-import java.awt.Dimension;
-import java.awt.event.WindowEvent;
 import java.io.File;
 import java.util.Locale;
 
-import javax.swing.BorderFactory;
-import javax.swing.JButton;
-import javax.swing.JFrame;
-import javax.swing.JLabel;
-import javax.swing.JMenu;
-import javax.swing.JMenuBar;
-import javax.swing.JMenuItem;
-import javax.swing.JPanel;
-import javax.swing.Box;
-import javax.swing.BoxLayout;
-import javax.swing.SwingConstants;
-import javax.swing.filechooser.FileNameExtensionFilter;
-import javax.swing.JFileChooser;
-
 import harmonizer.model.Song;
-import harmonizer.player.MusicPlayer;
+import javafx.geometry.Insets;
+import javafx.geometry.Pos;
+import javafx.scene.Scene;
+import javafx.scene.control.Button;
+import javafx.scene.control.Label;
+import javafx.scene.control.Menu;
+import javafx.scene.control.MenuBar;
+import javafx.scene.control.MenuItem;
+import javafx.scene.control.Separator;
+import javafx.scene.layout.BorderPane;
+import javafx.scene.layout.HBox;
+import javafx.scene.layout.Priority;
+import javafx.scene.layout.Region;
+import javafx.scene.layout.StackPane;
+import javafx.scene.layout.VBox;
+import javafx.stage.FileChooser;
+import javafx.stage.Stage;
 
 public final class HarmonizerWindow {
 	public interface Actions {
@@ -30,87 +28,57 @@ public final class HarmonizerWindow {
 		void saveMidi(File file);
 		void showUniqueChords();
 		void editChord();
-		void closePlayer();
+		void playPause();
+		void rewind();
+		void restart();
 	}
 
-	private final JFrame frame;
-	private final FileInfoDisplay fileInfo;
-	private final CardLayout songViewLayout;
-	private final JPanel songView;
-	private final JPanel emptyState;
-	private final JButton editButton;
-	private final JLabel songTitle;
-	private JMenuItem saveMenuItem;
-	private JMenu viewMenu;
+	private final Stage stage;
 	private final Actions actions;
+	private final FileInfoDisplay fileInfo = new FileInfoDisplay();
+	private final StackPane songContent = new StackPane();
+	private final VBox emptyState;
+	private final VBox loadedState;
+	private final MenuItem saveMenuItem = new MenuItem("Save");
+	private final MenuItem uniqueChordsMenuItem = new MenuItem("Show unique chords");
+	private final Button showChordsButton = new Button("Unique chords");
+	private final Button editChordButton = new Button("Edit chord");
+	private final Button playPauseButton = new Button("Play");
+	private final Button rewindButton = new Button("⏪ 10s");
+	private final Button restartButton = new Button("Restart");
+	private final Label songTitle = new Label("MIDI chord explorer");
 
-	public HarmonizerWindow(ChordDisplay chordDisplay, MusicPlayer musicPlayer, Clock clock, Actions actions) {
+	public HarmonizerWindow(Stage stage, Actions actions, ChordDisplay chordDisplay, Clock clock) {
+		this.stage = stage;
 		this.actions = actions;
-		frame = new JFrame("Harmonizer");
-		frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-		frame.addWindowListener(new java.awt.event.WindowAdapter() {
-			@Override
-			public void windowClosing(WindowEvent event) {
-				actions.closePlayer();
-			}
-		});
-		frame.setMinimumSize(new Dimension(680, 480));
-		frame.setPreferredSize(new Dimension(820, 600));
-		frame.setJMenuBar(createMenuBar());
+		stage.setTitle("Harmonizer");
+		stage.setMinWidth(720);
+		stage.setMinHeight(560);
 
-		fileInfo = new FileInfoDisplay();
-		JPanel content = new JPanel(new BorderLayout(12, 16));
-		content.setBorder(BorderFactory.createEmptyBorder(18, 24, 18, 24));
-
-		JPanel header = new JPanel(new BorderLayout(12, 0));
-		JLabel appTitle = new JLabel("Harmonizer");
-		appTitle.setFont(appTitle.getFont().deriveFont(java.awt.Font.BOLD, 22f));
-		songTitle = new JLabel("Listen closer. See the harmony.", SwingConstants.TRAILING);
-		songTitle.setForeground(new java.awt.Color(90, 99, 112));
-		JButton openMidiButton = new JButton("Open MIDI...");
-		openMidiButton.addActionListener(event -> chooseMidiFile(false));
-		header.add(appTitle, BorderLayout.WEST);
-		header.add(songTitle, BorderLayout.CENTER);
-		header.add(openMidiButton, BorderLayout.EAST);
-
-		songViewLayout = new CardLayout();
-		songView = new JPanel(songViewLayout);
 		emptyState = createEmptyState();
-		songView.add(emptyState, "empty");
-		songView.add(chordDisplay.getDisplay(), "song");
-		songViewLayout.show(songView, "empty");
+		loadedState = createLoadedState(chordDisplay);
+		songContent.getChildren().add(emptyState);
 
-		JPanel playbackPanel = new JPanel(new BorderLayout(8, 8));
-		playbackPanel.setBorder(BorderFactory.createTitledBorder("Playback"));
-		playbackPanel.add(musicPlayer.createPlayer(), BorderLayout.NORTH);
-		playbackPanel.add(clock.getComponent(), BorderLayout.CENTER);
+		BorderPane root = new BorderPane();
+		root.getStyleClass().add("app-root");
+		root.setTop(createHeader());
+		root.setCenter(songContent);
+		root.setBottom(createPlayerPanel(clock));
 
-		editButton = new JButton("Edit chord");
-		editButton.setEnabled(false);
-		editButton.addActionListener(event -> this.actions.editChord());
-		JPanel songPanel = new JPanel(new BorderLayout());
-		songPanel.setBorder(BorderFactory.createTitledBorder("Song information"));
-		songPanel.add(fileInfo.get(), BorderLayout.CENTER);
-
-		JPanel lowerPanel = new JPanel(new BorderLayout(8, 8));
-		lowerPanel.add(playbackPanel, BorderLayout.CENTER);
-		lowerPanel.add(editButton, BorderLayout.NORTH);
-		lowerPanel.add(songPanel, BorderLayout.SOUTH);
-
-		content.add(header, BorderLayout.NORTH);
-		content.add(songView, BorderLayout.CENTER);
-		content.add(lowerPanel, BorderLayout.SOUTH);
-		frame.add(content, BorderLayout.CENTER);
-		frame.pack();
-		frame.setLocationRelativeTo(null);
+		Scene scene = new Scene(root, 920, 680);
+		var stylesheet = HarmonizerWindow.class.getResource("/styles/harmonizer.css");
+		if (stylesheet != null) {
+			scene.getStylesheets().add(stylesheet.toExternalForm());
+		}
+		stage.setScene(scene);
 	}
 
 	public void show() {
-		frame.setVisible(true);
+		stage.show();
 	}
 
-	public JFrame getFrame() {
-		return frame;
+	public Stage getStage() {
+		return stage;
 	}
 
 	public void setSongInfo(Song song) {
@@ -119,80 +87,110 @@ public final class HarmonizerWindow {
 		songTitle.setText(title == null || title.isBlank() ? song.getFileName() : title);
 	}
 
-	public void setSongLoaded(boolean loaded) {
-		viewMenu.setEnabled(loaded);
-		saveMenuItem.setVisible(loaded);
-		editButton.setEnabled(loaded);
-		songViewLayout.show(songView, loaded ? "song" : "empty");
+	public void setSongLoaded(boolean loaded, boolean hasChords) {
+		songContent.getChildren().setAll(loaded ? loadedState : emptyState);
+		saveMenuItem.setDisable(!loaded);
+		uniqueChordsMenuItem.setDisable(!loaded);
+		showChordsButton.setDisable(!loaded);
+		editChordButton.setDisable(!loaded || !hasChords);
+		playPauseButton.setDisable(!loaded);
+		rewindButton.setDisable(!loaded);
+		restartButton.setDisable(!loaded);
 	}
 
-	private JPanel createEmptyState() {
-		JPanel emptyState = new JPanel();
-		emptyState.setLayout(new BoxLayout(emptyState, BoxLayout.Y_AXIS));
-		emptyState.setBorder(BorderFactory.createCompoundBorder(
-				BorderFactory.createLineBorder(new java.awt.Color(218, 224, 232)),
-				BorderFactory.createEmptyBorder(32, 24, 32, 24)));
+	private VBox createHeader() {
+		MenuItem openMenuItem = new MenuItem("Open MIDI...");
+		openMenuItem.setOnAction(event -> chooseMidiFile(false));
+		saveMenuItem.setDisable(true);
+		saveMenuItem.setOnAction(event -> chooseMidiFile(true));
+		Menu fileMenu = new Menu("File");
+		fileMenu.getItems().addAll(openMenuItem, saveMenuItem);
 
-		JLabel heading = new JLabel("Start with a MIDI file", SwingConstants.CENTER);
-		heading.setFont(heading.getFont().deriveFont(java.awt.Font.BOLD, 24f));
-		JLabel description = new JLabel(
-				"Open a song to explore its chords and play along.",
-				SwingConstants.CENTER);
-		description.setForeground(new java.awt.Color(90, 99, 112));
-		JButton openButton = new JButton("Choose MIDI file...");
-		openButton.addActionListener(event -> chooseMidiFile(false));
+		showChordsButton.setDisable(true);
+		showChordsButton.setOnAction(event -> actions.showUniqueChords());
+		Menu viewMenu = new Menu("View");
+		uniqueChordsMenuItem.setDisable(true);
+		uniqueChordsMenuItem.setOnAction(event -> actions.showUniqueChords());
+		viewMenu.getItems().add(uniqueChordsMenuItem);
 
-		heading.setAlignmentX(JLabel.CENTER_ALIGNMENT);
-		description.setAlignmentX(JLabel.CENTER_ALIGNMENT);
-		openButton.setAlignmentX(JButton.CENTER_ALIGNMENT);
-		emptyState.add(Box.createVerticalGlue());
-		emptyState.add(heading);
-		emptyState.add(Box.createVerticalStrut(10));
-		emptyState.add(description);
-		emptyState.add(Box.createVerticalStrut(20));
-		emptyState.add(openButton);
-		emptyState.add(Box.createVerticalGlue());
-		return emptyState;
+		MenuBar menuBar = new MenuBar(fileMenu, viewMenu);
+		Label appName = new Label("Harmonizer");
+		appName.getStyleClass().add("app-title");
+		songTitle.getStyleClass().add("song-title");
+		Button openButton = new Button("Open MIDI");
+		openButton.getStyleClass().add("primary-button");
+		openButton.setOnAction(event -> chooseMidiFile(false));
+
+		Region spacer = new Region();
+		HBox.setHgrow(spacer, Priority.ALWAYS);
+		HBox titleRow = new HBox(18, appName, spacer, songTitle, openButton);
+		titleRow.setAlignment(Pos.CENTER_LEFT);
+		titleRow.setPadding(new Insets(14, 24, 14, 24));
+
+		VBox header = new VBox(menuBar, titleRow, new Separator());
+		return header;
 	}
 
-	private JMenuBar createMenuBar() {
-		JMenuBar menuBar = new JMenuBar();
-		JMenu fileMenu = new JMenu("File");
-		JMenuItem importMenuItem = new JMenuItem("Import");
-		saveMenuItem = new JMenuItem("Save");
-		JMenuItem exitMenuItem = new JMenuItem("Exit");
-		viewMenu = new JMenu("View");
-		JMenuItem showChordsItem = new JMenuItem("Show Unique Chords");
+	private VBox createEmptyState() {
+		Label heading = new Label("Start with a MIDI file");
+		heading.getStyleClass().add("empty-heading");
+		Label description = new Label("Open a song to explore its chords and play along.");
+		description.getStyleClass().add("subtle-text");
+		Button openButton = new Button("Choose MIDI file");
+		openButton.getStyleClass().add("primary-button");
+		openButton.setOnAction(event -> chooseMidiFile(false));
 
-		importMenuItem.addActionListener(event -> chooseMidiFile(false));
-		saveMenuItem.addActionListener(event -> chooseMidiFile(true));
-		exitMenuItem.addActionListener(event ->
-				frame.dispatchEvent(new WindowEvent(frame, WindowEvent.WINDOW_CLOSING)));
-		showChordsItem.addActionListener(event -> actions.showUniqueChords());
+		VBox card = new VBox(16, heading, description, openButton);
+		card.setAlignment(Pos.CENTER);
+		card.getStyleClass().add("empty-card");
+		StackPane.setMargin(card, new Insets(28));
+		VBox.setVgrow(card, Priority.ALWAYS);
+		return card;
+	}
 
-		saveMenuItem.setVisible(false);
-		viewMenu.setEnabled(false);
-		viewMenu.add(showChordsItem);
-		fileMenu.add(importMenuItem);
-		fileMenu.add(saveMenuItem);
-		fileMenu.add(exitMenuItem);
-		menuBar.add(fileMenu);
-		menuBar.add(viewMenu);
-		return menuBar;
+	private VBox createLoadedState(ChordDisplay chordDisplay) {
+		HBox actionsRow = new HBox(10, editChordButton, showChordsButton);
+		actionsRow.setAlignment(Pos.CENTER_RIGHT);
+
+		VBox infoCard = new VBox(8, new Label("SONG DETAILS"), fileInfo.getView());
+		infoCard.getStyleClass().add("info-card");
+
+		VBox loaded = new VBox(20, chordDisplay.getView(), actionsRow, infoCard);
+		loaded.setPadding(new Insets(24));
+		VBox.setVgrow(chordDisplay.getView(), Priority.ALWAYS);
+		return loaded;
+	}
+
+	private VBox createPlayerPanel(Clock clock) {
+		Label sectionTitle = new Label("PLAYER");
+		sectionTitle.getStyleClass().add("section-title");
+		playPauseButton.setDisable(true);
+		playPauseButton.setOnAction(event -> actions.playPause());
+		rewindButton.setDisable(true);
+		rewindButton.setOnAction(event -> actions.rewind());
+		restartButton.setDisable(true);
+		restartButton.setOnAction(event -> actions.restart());
+		clock.setPlayingListener(playing -> playPauseButton.setText(playing ? "Pause" : "Play"));
+
+		HBox controls = new HBox(10, rewindButton, playPauseButton, restartButton);
+		controls.setAlignment(Pos.CENTER);
+		VBox panel = new VBox(8, sectionTitle, controls, clock.getView());
+		panel.getStyleClass().add("player-panel");
+		panel.setPadding(new Insets(14, 24, 18, 24));
+		return panel;
 	}
 
 	private void chooseMidiFile(boolean save) {
-		JFileChooser chooser = new JFileChooser();
-		chooser.setFileFilter(new FileNameExtensionFilter("MIDI files (*.mid, *.midi)", "mid", "midi"));
-		int result = save ? chooser.showSaveDialog(frame) : chooser.showOpenDialog(frame);
-		if (result != JFileChooser.APPROVE_OPTION) {
+		FileChooser chooser = new FileChooser();
+		chooser.setTitle(save ? "Save MIDI file" : "Open MIDI file");
+		chooser.getExtensionFilters().add(
+				new FileChooser.ExtensionFilter("MIDI files (*.mid, *.midi)", "*.mid", "*.midi"));
+		File selectedFile = save ? chooser.showSaveDialog(stage) : chooser.showOpenDialog(stage);
+		if (selectedFile == null) {
 			return;
 		}
-
-		File selectedFile = chooser.getSelectedFile();
 		if (save) {
-			selectedFile = ensureMidiExtension(selectedFile);
-			actions.saveMidi(selectedFile);
+			actions.saveMidi(ensureMidiExtension(selectedFile));
 		} else {
 			actions.importMidi(selectedFile);
 		}

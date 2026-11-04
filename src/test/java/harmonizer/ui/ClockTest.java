@@ -30,4 +30,12 @@ class ClockTest {
 		assertEquals(60_000_000, Clock.toMicroseconds(Clock.SLIDER_MAXIMUM + 1, 60_000_000));
 		assertEquals(0, Clock.toMicroseconds(Clock.SLIDER_MAXIMUM, -1));
 	}
+
+	@Test
+	void mapsPlaybackTimeBackToTimelinePosition() {
+		assertEquals(0, Clock.toSliderValue(0, 60_000_000));
+		assertEquals(Clock.SLIDER_MAXIMUM / 2, Clock.toSliderValue(30_000_000, 60_000_000));
+		assertEquals(Clock.SLIDER_MAXIMUM, Clock.toSliderValue(60_000_000, 60_000_000));
+		assertEquals(0, Clock.toSliderValue(1, 0));
+	}
 }

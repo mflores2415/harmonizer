@@ -4,29 +4,31 @@ import java.io.File;
 import java.io.IOException;
 
 import javax.sound.midi.MidiSystem;
-import javax.swing.JOptionPane;
 
 import harmonizer.model.Song;
 import harmonizer.player.MusicPlayer;
+import harmonizer.player.PlaybackUpdate;
 import harmonizer.ui.ChordDisplay;
 import harmonizer.ui.Clock;
 import harmonizer.ui.EditChordWindow;
 import harmonizer.ui.HarmonizerWindow;
 import harmonizer.ui.UniqueChordWindow;
+import javafx.application.Platform;
+import javafx.scene.control.Alert;
+import javafx.stage.Stage;
 
 public final class HarmonizerController implements HarmonizerWindow.Actions {
-	private final ChordDisplay chordDisplay;
-	private final Clock clock;
+	private final ChordDisplay chordDisplay = new ChordDisplay();
 	private final MusicPlayer musicPlayer;
+	private final Clock clock;
 	private final HarmonizerWindow window;
 	private Song song;
 
-	public HarmonizerController() {
-		chordDisplay = new ChordDisplay();
-		clock = new Clock();
-		musicPlayer = new MusicPlayer(clock, chordDisplay);
-		clock.setMusicPlayer(musicPlayer);
-		window = new HarmonizerWindow(chordDisplay, musicPlayer, clock, this);
+	public HarmonizerController(Stage stage) {
+		musicPlayer = new MusicPlayer();
+		clock = new Clock(musicPlayer);
+		window = new HarmonizerWindow(stage, this, chordDisplay, clock);
+		musicPlayer.setListener(this::updatePlayback);
 	}
 
 	public void show() {
@@ -39,9 +41,11 @@ public final class HarmonizerController implements HarmonizerWindow.Actions {
 			Song importedSong = new Song(file.toPath());
 			musicPlayer.setSequence(importedSong.getSequence());
 			song = importedSong;
+			chordDisplay.set("— —", 0);
 			window.setSongInfo(song);
-			window.setSongLoaded(true);
-			clock.createClock();
+			window.setSongLoaded(true, !song.getMap().isEmpty());
+			clock.reset();
+			updatePlayback(new PlaybackUpdate(0, musicPlayer.getDurationMicroseconds(), false, null, 0));
 		} catch (Exception exception) {
 			showError(exception);
 		}
@@ -65,28 +69,61 @@ public final class HarmonizerController implements HarmonizerWindow.Actions {
 	@Override
 	public void showUniqueChords() {
 		if (song != null) {
-			new UniqueChordWindow(song.getChords());
+			new UniqueChordWindow(window.getStage(), song.getChords()).show();
 		}
 	}
 
 	@Override
 	public void editChord() {
-		if (song != null) {
+		if (song != null && !song.getMap().isEmpty()) {
 			musicPlayer.pause();
-			new EditChordWindow(chordDisplay.getTick(), song, chordDisplay.getChords(), chordDisplay::set);
+			EditChordWindow.show(
+					window.getStage(),
+					song,
+					chordDisplay.getTick(),
+					chordDisplay.getChords(),
+					chordDisplay::set);
 		}
 	}
 
 	@Override
+	public void playPause() {
+		if (musicPlayer.isPlaying()) {
+			musicPlayer.pause();
+		} else {
+			musicPlayer.play();
+		}
+	}
+
+	@Override
+	public void rewind() {
+		musicPlayer.rewind();
+	}
+
+	@Override
+	public void restart() {
+		musicPlayer.replay();
+	}
+
 	public void closePlayer() {
 		musicPlayer.close();
 	}
 
+	private void updatePlayback(PlaybackUpdate update) {
+		Platform.runLater(() -> {
+			if (update.chordText() != null) {
+				chordDisplay.set(update.chordText(), update.chordTick());
+			}
+			clock.update(update);
+		});
+	}
+
 	private void showError(Exception exception) {
-		JOptionPane.showMessageDialog(
-				window.getFrame(),
-				exception.toString(),
-				"Unable to process MIDI file",
-				JOptionPane.ERROR_MESSAGE);
+		Alert alert = new Alert(Alert.AlertType.ERROR);
+		alert.initOwner(window.getStage());
+		alert.setTitle("MIDI error");
+		alert.setHeaderText("Unable to process MIDI file");
+		alert.setContentText(exception.toString());
+		alert.showAndWait();
 	}
 }
