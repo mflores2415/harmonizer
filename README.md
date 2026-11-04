@@ -1,7 +1,7 @@
 # Harmonizer
 
-Harmonizer is a JavaFX desktop application for analyzing chords in MIDI files
-and playing them back alongside the chord display.
+Harmonizer is a JavaFX desktop application for analyzing chords in MIDI and
+Karaoke MIDI files and playing them back alongside the chord display.
 
 ## Requirements
 
@@ -25,6 +25,9 @@ mvn test
 
 The playback controls include play/pause, restart, a 10-second rewind, and a
 timeline that can be clicked or dragged to seek through a MIDI file.
+Karaoke `.kar` files can be opened alongside `.mid` and `.midi` files; their
+existing lyrics are preserved, while Harmonizer displays its generated chord
+labels during playback.
 Use **Chord analysis** to switch between Detailed mode, which shows every
 recognized chord-quality change, and Steady mode, which keeps the first chord
 quality until the root changes. The selected mode can be changed while a song

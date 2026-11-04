@@ -33,6 +33,7 @@ class MusicPlayerTest {
 			var track = sequence.createTrack();
 			track.add(new MidiEvent(noteOn, 0));
 			track.add(new MidiEvent(noteOff, 1_920));
+			addLyric(track, "Hello world", 0);
 			addLyric(track, "Cmaj Gmaj", 0);
 			addLyric(track, "Gmaj END", 960);
 			player.setSequence(sequence);

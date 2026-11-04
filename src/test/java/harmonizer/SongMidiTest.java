@@ -36,6 +36,22 @@ class SongMidiTest {
 	}
 
 	@Test
+	void importsKaraokeMidiAndPreservesItsLyrics() throws Exception {
+		Path karaokeFile = tempDir.resolve("song.kar");
+		Sequence sequence = new Sequence(Sequence.PPQ, 480);
+		var track = sequence.createTrack();
+		addMeta(track, 5, "Hello world".getBytes(StandardCharsets.UTF_8), 0);
+		addTriad(track, 60, 64, 67, 0, 480);
+		MidiSystem.write(sequence, 1, karaokeFile.toFile());
+
+		Song song = new Song(karaokeFile);
+
+		assertTrue(song.getMap().values().stream().anyMatch(chord -> chord.getName().equals("Cmaj")));
+		assertTrue(hasLyric(song.getSequence(), 0, "Hello world"));
+		assertTrue(hasLyric(song.getSequence(), song.getFirstTick(), "Cmaj END"));
+	}
+
+	@Test
 	void editingChordUpdatesModelAndMidiLyric() throws Exception {
 		Path midiFile = createChordMidi("editable-chord.mid");
 		Song song = new Song(midiFile);

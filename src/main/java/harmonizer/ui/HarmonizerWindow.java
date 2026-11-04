@@ -110,7 +110,7 @@ public final class HarmonizerWindow {
 	}
 
 	private VBox createHeader() {
-		MenuItem openMenuItem = new MenuItem("Open MIDI...");
+		MenuItem openMenuItem = new MenuItem("Open MIDI/Karaoke...");
 		openMenuItem.setOnAction(event -> chooseMidiFile(false));
 		saveMenuItem.setDisable(true);
 		saveMenuItem.setOnAction(event -> chooseMidiFile(true));
@@ -137,7 +137,7 @@ public final class HarmonizerWindow {
 		Label appName = new Label("Harmonizer");
 		appName.getStyleClass().add("app-title");
 		songTitle.getStyleClass().add("song-title");
-		Button openButton = new Button("Open MIDI");
+		Button openButton = new Button("Open MIDI/Karaoke");
 		openButton.getStyleClass().add("primary-button");
 		openButton.setOnAction(event -> chooseMidiFile(false));
 
@@ -152,11 +152,11 @@ public final class HarmonizerWindow {
 	}
 
 	private VBox createEmptyState() {
-		Label heading = new Label("Start with a MIDI file");
+		Label heading = new Label("Start with a MIDI or karaoke file");
 		heading.getStyleClass().add("empty-heading");
 		Label description = new Label("Open a song to explore its chords and play along.");
 		description.getStyleClass().add("subtle-text");
-		Button openButton = new Button("Choose MIDI file");
+		Button openButton = new Button("Choose MIDI or karaoke file");
 		openButton.getStyleClass().add("primary-button");
 		openButton.setOnAction(event -> chooseMidiFile(false));
 
@@ -202,9 +202,10 @@ public final class HarmonizerWindow {
 
 	private void chooseMidiFile(boolean save) {
 		FileChooser chooser = new FileChooser();
-		chooser.setTitle(save ? "Save MIDI file" : "Open MIDI file");
+		chooser.setTitle(save ? "Save MIDI file" : "Open MIDI or karaoke file");
 		chooser.getExtensionFilters().add(
-				new FileChooser.ExtensionFilter("MIDI files (*.mid, *.midi)", "*.mid", "*.midi"));
+				new FileChooser.ExtensionFilter(
+						"MIDI/Karaoke files (*.mid, *.midi, *.kar)", "*.mid", "*.midi", "*.kar"));
 		File selectedFile = save ? chooser.showSaveDialog(stage) : chooser.showOpenDialog(stage);
 		if (selectedFile == null) {
 			return;
@@ -218,7 +219,7 @@ public final class HarmonizerWindow {
 
 	private File ensureMidiExtension(File file) {
 		String name = file.getName().toLowerCase(Locale.ROOT);
-		if (name.endsWith(".mid") || name.endsWith(".midi")) {
+		if (name.endsWith(".mid") || name.endsWith(".midi") || name.endsWith(".kar")) {
 			return file;
 		}
 		return new File(file.getParentFile(), file.getName() + ".mid");

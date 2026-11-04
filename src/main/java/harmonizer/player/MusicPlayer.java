@@ -5,6 +5,7 @@ import java.util.Map;
 import java.util.NavigableMap;
 import java.util.TreeMap;
 import java.util.function.Consumer;
+import java.util.regex.Pattern;
 
 import javax.sound.midi.InvalidMidiDataException;
 import javax.sound.midi.MetaEventListener;
@@ -18,6 +19,9 @@ import javax.sound.midi.Track;
 public final class MusicPlayer implements MusicPlayback, MetaEventListener {
 	private static final int META_LYRIC = 5;
 	private static final long REWIND_INTERVAL_MICROSECONDS = 10_000_000L;
+	private static final Pattern CHORD_LYRIC = Pattern.compile(
+			"[A-G](?:#|b)?(?:maj|min|aug|dim|rr)(?:\\((?:m7|M7)\\))? "
+					+ "(?:[A-G](?:#|b)?(?:maj|min|aug|dim|rr)(?:\\((?:m7|M7)\\))?|END)");
 
 	private final Sequencer sequencer;
 	private final NavigableMap<Long, String> chordLyrics = new TreeMap<>();
@@ -50,8 +54,10 @@ public final class MusicPlayer implements MusicPlayback, MetaEventListener {
 			for (int index = 0; index < track.size(); index++) {
 				if (track.get(index).getMessage() instanceof MetaMessage message
 						&& message.getType() == META_LYRIC) {
-					chordLyrics.put(track.get(index).getTick(),
-							new String(message.getData(), StandardCharsets.UTF_8));
+					String lyric = new String(message.getData(), StandardCharsets.UTF_8);
+					if (CHORD_LYRIC.matcher(lyric).matches()) {
+						chordLyrics.put(track.get(index).getTick(), lyric);
+					}
 				}
 			}
 		}
