@@ -28,6 +28,7 @@ public final class Clock {
 	private long durationMicroseconds;
 	private boolean updatingSlider;
 	private Consumer<Boolean> playingListener = playing -> { };
+	private Consumer<PlaybackUpdate> updateListener = update -> { };
 
 	public Clock(MusicPlayback musicPlayback) {
 		this.musicPlayback = musicPlayback;
@@ -79,6 +80,10 @@ public final class Clock {
 		this.playingListener = playingListener;
 	}
 
+	public void setUpdateListener(Consumer<PlaybackUpdate> updateListener) {
+		this.updateListener = updateListener;
+	}
+
 	public void update(PlaybackUpdate update) {
 		durationMicroseconds = update.durationMicroseconds();
 		timeline.setDisable(durationMicroseconds <= 0);
@@ -98,6 +103,7 @@ public final class Clock {
 			playingListener.accept(false);
 			refreshTimeline.pause();
 		}
+		updateListener.accept(update);
 	}
 
 	private void updateFromPlayer() {

@@ -1,9 +1,11 @@
 package harmonizer.ui;
 
 import java.io.File;
+import java.util.List;
 import java.util.Locale;
 
 import harmonizer.model.ChordAnalysisMode;
+import harmonizer.model.InstrumentPart;
 import harmonizer.model.Song;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
@@ -35,6 +37,7 @@ public final class HarmonizerWindow {
 		void rewind();
 		void restart();
 		void changeAnalysisMode(ChordAnalysisMode mode);
+		void changeInstrumentView(boolean enabled);
 	}
 
 	private final Stage stage;
@@ -43,16 +46,22 @@ public final class HarmonizerWindow {
 	private final StackPane songContent = new StackPane();
 	private final VBox emptyState;
 	private final VBox loadedState;
+	private final InstrumentDisplay instrumentDisplay = new InstrumentDisplay();
 	private final MenuItem saveMenuItem = new MenuItem("Save");
 	private final MenuItem uniqueChordsMenuItem = new MenuItem("Show unique chords");
 	private final RadioMenuItem detailedAnalysisItem = new RadioMenuItem("Detailed (show chord qualities)");
 	private final RadioMenuItem steadyAnalysisItem = new RadioMenuItem("Steady (hold quality while root stays)");
+	private final RadioMenuItem chordDisplayItem = new RadioMenuItem("Chords");
+	private final RadioMenuItem instrumentDisplayItem = new RadioMenuItem("Instruments");
 	private final Button showChordsButton = new Button("Unique chords");
 	private final Button editChordButton = new Button("Edit chord");
 	private final Button playPauseButton = new Button("Play");
 	private final Button rewindButton = new Button("⏪ 10s");
 	private final Button restartButton = new Button("Restart");
 	private final Label songTitle = new Label("MIDI chord explorer");
+	private boolean instrumentView;
+	private boolean songLoaded;
+	private boolean hasChords;
 
 	public HarmonizerWindow(Stage stage, Actions actions, ChordDisplay chordDisplay, Clock clock) {
 		this.stage = stage;
@@ -94,14 +103,29 @@ public final class HarmonizerWindow {
 	}
 
 	public void setSongLoaded(boolean loaded, boolean hasChords) {
+		songLoaded = loaded;
+		this.hasChords = hasChords;
 		songContent.getChildren().setAll(loaded ? loadedState : emptyState);
 		saveMenuItem.setDisable(!loaded);
 		uniqueChordsMenuItem.setDisable(!loaded);
 		showChordsButton.setDisable(!loaded);
-		editChordButton.setDisable(!loaded || !hasChords);
+		editChordButton.setDisable(!loaded || !hasChords || instrumentView);
 		playPauseButton.setDisable(!loaded);
 		rewindButton.setDisable(!loaded);
 		restartButton.setDisable(!loaded);
+	}
+
+	public void setInstrumentParts(List<InstrumentPart> parts, long tick) {
+		instrumentDisplay.update(parts, tick);
+	}
+
+	public void setInstrumentView(boolean enabled) {
+		instrumentView = enabled;
+		chordDisplayItem.setSelected(!enabled);
+		instrumentDisplayItem.setSelected(enabled);
+		instrumentDisplay.getView().setVisible(enabled);
+		instrumentDisplay.getView().setManaged(enabled);
+		editChordButton.setDisable(!songLoaded || !hasChords || enabled);
 	}
 
 	public void setAnalysisMode(ChordAnalysisMode mode) {
@@ -133,7 +157,16 @@ public final class HarmonizerWindow {
 		Menu analysisMenu = new Menu("Chord analysis");
 		analysisMenu.getItems().addAll(detailedAnalysisItem, steadyAnalysisItem);
 
-		MenuBar menuBar = new MenuBar(fileMenu, viewMenu, analysisMenu);
+		ToggleGroup displayModes = new ToggleGroup();
+		chordDisplayItem.setToggleGroup(displayModes);
+		instrumentDisplayItem.setToggleGroup(displayModes);
+		chordDisplayItem.setSelected(true);
+		chordDisplayItem.setOnAction(event -> actions.changeInstrumentView(false));
+		instrumentDisplayItem.setOnAction(event -> actions.changeInstrumentView(true));
+		Menu displayMenu = new Menu("Display");
+		displayMenu.getItems().addAll(chordDisplayItem, instrumentDisplayItem);
+
+		MenuBar menuBar = new MenuBar(fileMenu, viewMenu, displayMenu, analysisMenu);
 		Label appName = new Label("Harmonizer");
 		appName.getStyleClass().add("app-title");
 		songTitle.getStyleClass().add("song-title");
@@ -175,9 +208,12 @@ public final class HarmonizerWindow {
 		VBox infoCard = new VBox(8, new Label("SONG DETAILS"), fileInfo.getView());
 		infoCard.getStyleClass().add("info-card");
 
-		VBox loaded = new VBox(20, chordDisplay.getView(), actionsRow, infoCard);
+		StackPane analysisView = new StackPane(chordDisplay.getView(), instrumentDisplay.getView());
+		instrumentDisplay.getView().setVisible(false);
+		instrumentDisplay.getView().setManaged(false);
+		VBox loaded = new VBox(20, analysisView, actionsRow, infoCard);
 		loaded.setPadding(new Insets(24));
-		VBox.setVgrow(chordDisplay.getView(), Priority.ALWAYS);
+		VBox.setVgrow(analysisView, Priority.ALWAYS);
 		return loaded;
 	}
 

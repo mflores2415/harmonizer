@@ -38,6 +38,24 @@
     -fx-border-radius: 10px;
 }
 
+.instrument-display {
+    -fx-background-color: white;
+    -fx-background-radius: 10px;
+    -fx-border-color: #dce3ec;
+    -fx-border-radius: 10px;
+    -fx-padding: 18px;
+}
+
+.instrument-display .table-view {
+    -fx-background-color: transparent;
+    -fx-border-color: #dce3ec;
+    -fx-border-radius: 5px;
+}
+
+.instrument-display .column-header-background {
+    -fx-background-color: #edf4fd;
+}
+
 .empty-heading, .dialog-title {
     -fx-font-size: 23px;
     -fx-font-weight: bold;

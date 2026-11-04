@@ -26,6 +26,7 @@ public class Song {
 	private final Map<Long, String> chordOverrides = new HashMap<>();
 	private final String fileName;
 	private final Sequence sourceSequence;
+	private final List<InstrumentPart> instrumentParts;
 	private Sequence sequence;
 	private Track lyricTrack;
 	private List<Long> ticks = List.of();
@@ -43,6 +44,7 @@ public class Song {
 	public Song(Path midiFile, ChordAnalysisMode analysisMode) throws IOException, InvalidMidiDataException {
 		fileName = midiFile.getFileName().toString();
 		sourceSequence = MidiSystem.getSequence(midiFile.toFile());
+		instrumentParts = InstrumentPart.fromSequence(sourceSequence);
 		setAnalysisMode(analysisMode);
 	}
 
@@ -94,6 +96,10 @@ public class Song {
 
 	public String getFileName() {
 		return fileName;
+	}
+
+	public List<InstrumentPart> getInstrumentParts() {
+		return instrumentParts;
 	}
 
 	public void editChord(

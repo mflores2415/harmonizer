@@ -5,5 +5,6 @@ public record PlaybackUpdate(
 		long durationMicroseconds,
 		boolean playing,
 		String chordText,
-		long chordTick) {
+		long chordTick,
+		long tick) {
 }

@@ -31,6 +31,11 @@ public final class HarmonizerController implements HarmonizerWindow.Actions {
 		this.musicPlayback = Objects.requireNonNull(musicPlayback, "musicPlayback");
 		clock = new Clock(musicPlayback);
 		window = new HarmonizerWindow(stage, this, chordDisplay, clock);
+		clock.setUpdateListener(update -> {
+			if (song != null) {
+				window.setInstrumentParts(song.getInstrumentParts(), update.tick());
+			}
+		});
 		musicPlayback.setListener(this::updatePlayback);
 	}
 
@@ -48,7 +53,7 @@ public final class HarmonizerController implements HarmonizerWindow.Actions {
 			window.setSongInfo(song);
 			window.setSongLoaded(true, !song.getMap().isEmpty());
 			clock.reset();
-			updatePlayback(new PlaybackUpdate(0, musicPlayback.getDurationMicroseconds(), false, null, 0));
+			updatePlayback(musicPlayback.getPlaybackUpdate());
 		} catch (Exception exception) {
 			showError(exception);
 		}
@@ -136,6 +141,11 @@ public final class HarmonizerController implements HarmonizerWindow.Actions {
 			window.setAnalysisMode(analysisMode);
 			showError(exception);
 		}
+	}
+
+	@Override
+	public void changeInstrumentView(boolean enabled) {
+		window.setInstrumentView(enabled);
 	}
 
 	public void closePlayer() {

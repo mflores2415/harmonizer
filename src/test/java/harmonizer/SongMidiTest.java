@@ -2,6 +2,7 @@ package harmonizer;
 
 import harmonizer.model.Song;
 import harmonizer.model.ChordAnalysisMode;
+import harmonizer.model.InstrumentPart;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -10,6 +11,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
+import java.util.List;
 
 import javax.sound.midi.MidiEvent;
 import javax.sound.midi.MetaMessage;
@@ -207,6 +209,29 @@ class SongMidiTest {
 		assertEquals(1, song.getMap().size());
 		assertEquals("Cmaj", song.getMap().values().iterator().next().getName());
 		assertEquals(0, song.getMap().keySet().iterator().next());
+	}
+
+	@Test
+	void listsInstrumentPartsAndNotesAtRequestedTicks() throws Exception {
+		Path midiFile = tempDir.resolve("trumpet-part.mid");
+		Sequence sequence = new Sequence(Sequence.PPQ, 480);
+		var track = sequence.createTrack();
+		addMeta(track, 3, "Lead".getBytes(StandardCharsets.UTF_8), 0);
+		ShortMessage programChange = new ShortMessage();
+		programChange.setMessage(ShortMessage.PROGRAM_CHANGE, 0, 56, 0);
+		track.add(new MidiEvent(programChange, 0));
+		addTriad(track, 60, 64, 67, 0, 480);
+		MidiSystem.write(sequence, 1, midiFile.toFile());
+
+		Song song = new Song(midiFile);
+
+		assertEquals(1, song.getInstrumentParts().size());
+		InstrumentPart trumpet = song.getInstrumentParts().get(0);
+		assertTrue(trumpet.getName().contains("Trumpet"));
+		assertEquals(List.of(60, 64, 67), trumpet.getNotesAt(0));
+		assertEquals(List.of(60, 64, 67), trumpet.getNotesAt(240));
+		assertEquals(List.of(), trumpet.getNotesAt(480));
+		assertEquals("C4", InstrumentPart.formatNote(60));
 	}
 
 	private Path createChordMidi(String fileName) throws Exception {

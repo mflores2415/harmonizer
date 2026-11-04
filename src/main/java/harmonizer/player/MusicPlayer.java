@@ -92,7 +92,8 @@ public final class MusicPlayer implements MusicPlayback, MetaEventListener {
 				getDurationMicroseconds(),
 				isPlaying(),
 				lyric == null ? null : lyric.getValue(),
-				lyric == null ? tick : lyric.getKey());
+				lyric == null ? tick : lyric.getKey(),
+				tick);
 	}
 
 	@Override

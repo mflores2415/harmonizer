@@ -28,6 +28,9 @@ timeline that can be clicked or dragged to seek through a MIDI file.
 Karaoke `.kar` files can be opened alongside `.mid` and `.midi` files; their
 existing lyrics are preserved, while Harmonizer displays its generated chord
 labels during playback.
+Use **Display → Instruments** to see each MIDI instrument part and the notes
+sounding at the playhead. The list follows playback and seeking; **Display →
+Chords** returns to the chord cards.
 Use **Chord analysis** to switch between Detailed mode, which shows every
 recognized chord-quality change, and Steady mode, which keeps the first chord
 quality until the root changes. The selected mode can be changed while a song
