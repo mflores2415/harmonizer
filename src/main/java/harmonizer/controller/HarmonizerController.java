@@ -2,11 +2,13 @@ package harmonizer.controller;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.Objects;
 
 import javax.sound.midi.MidiSystem;
 
+import harmonizer.model.ChordAnalysisMode;
 import harmonizer.model.Song;
-import harmonizer.player.MusicPlayer;
+import harmonizer.player.MusicPlayback;
 import harmonizer.player.PlaybackUpdate;
 import harmonizer.ui.ChordDisplay;
 import harmonizer.ui.Clock;
@@ -19,16 +21,17 @@ import javafx.stage.Stage;
 
 public final class HarmonizerController implements HarmonizerWindow.Actions {
 	private final ChordDisplay chordDisplay = new ChordDisplay();
-	private final MusicPlayer musicPlayer;
+	private final MusicPlayback musicPlayback;
 	private final Clock clock;
 	private final HarmonizerWindow window;
 	private Song song;
+	private ChordAnalysisMode analysisMode = ChordAnalysisMode.DETAILED;
 
-	public HarmonizerController(Stage stage) {
-		musicPlayer = new MusicPlayer();
-		clock = new Clock(musicPlayer);
+	public HarmonizerController(Stage stage, MusicPlayback musicPlayback) {
+		this.musicPlayback = Objects.requireNonNull(musicPlayback, "musicPlayback");
+		clock = new Clock(musicPlayback);
 		window = new HarmonizerWindow(stage, this, chordDisplay, clock);
-		musicPlayer.setListener(this::updatePlayback);
+		musicPlayback.setListener(this::updatePlayback);
 	}
 
 	public void show() {
@@ -38,14 +41,14 @@ public final class HarmonizerController implements HarmonizerWindow.Actions {
 	@Override
 	public void importMidi(File file) {
 		try {
-			Song importedSong = new Song(file.toPath());
-			musicPlayer.setSequence(importedSong.getSequence());
+			Song importedSong = new Song(file.toPath(), analysisMode);
+			musicPlayback.setSequence(importedSong.getSequence());
 			song = importedSong;
 			chordDisplay.set("— —", 0);
 			window.setSongInfo(song);
 			window.setSongLoaded(true, !song.getMap().isEmpty());
 			clock.reset();
-			updatePlayback(new PlaybackUpdate(0, musicPlayer.getDurationMicroseconds(), false, null, 0));
+			updatePlayback(new PlaybackUpdate(0, musicPlayback.getDurationMicroseconds(), false, null, 0));
 		} catch (Exception exception) {
 			showError(exception);
 		}
@@ -76,7 +79,7 @@ public final class HarmonizerController implements HarmonizerWindow.Actions {
 	@Override
 	public void editChord() {
 		if (song != null && !song.getMap().isEmpty()) {
-			musicPlayer.pause();
+			musicPlayback.pause();
 			EditChordWindow.show(
 					window.getStage(),
 					song,
@@ -88,25 +91,55 @@ public final class HarmonizerController implements HarmonizerWindow.Actions {
 
 	@Override
 	public void playPause() {
-		if (musicPlayer.isPlaying()) {
-			musicPlayer.pause();
+		if (musicPlayback.isPlaying()) {
+			musicPlayback.pause();
 		} else {
-			musicPlayer.play();
+			musicPlayback.play();
 		}
 	}
 
 	@Override
 	public void rewind() {
-		musicPlayer.rewind();
+		musicPlayback.rewind();
 	}
 
 	@Override
 	public void restart() {
-		musicPlayer.replay();
+		musicPlayback.replay();
+	}
+
+	@Override
+	public void changeAnalysisMode(ChordAnalysisMode mode) {
+		if (mode == analysisMode) {
+			return;
+		}
+		if (song == null) {
+			analysisMode = mode;
+			window.setAnalysisMode(mode);
+			return;
+		}
+
+		long position = musicPlayback.getPositionMicroseconds();
+		boolean wasPlaying = musicPlayback.isPlaying();
+		try {
+			song.setAnalysisMode(mode);
+			analysisMode = mode;
+			musicPlayback.setSequence(song.getSequence());
+			musicPlayback.seekToMicroseconds(position);
+			window.setSongLoaded(true, !song.getMap().isEmpty());
+			clock.reset();
+			if (wasPlaying) {
+				musicPlayback.play();
+			}
+			updatePlayback(musicPlayback.getPlaybackUpdate());
+		} catch (Exception exception) {
+			window.setAnalysisMode(analysisMode);
+			showError(exception);
+		}
 	}
 
 	public void closePlayer() {
-		musicPlayer.close();
+		musicPlayback.close();
 	}
 
 	private void updatePlayback(PlaybackUpdate update) {

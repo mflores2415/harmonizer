@@ -21,7 +21,7 @@ public final class EditChordWindow {
 			"C", "Db", "D", "Eb", "E", "F", "Gb", "G", "Ab", "A", "Bb", "B"
 	};
 	private static final String[] TYPES = {
-			"maj", "min", "maj(m7)", "maj(M7)", "min(m7)", "min(M7)"
+			"maj", "min", "aug", "dim", "maj(m7)", "maj(M7)", "min(m7)", "min(M7)"
 	};
 
 	private EditChordWindow() {

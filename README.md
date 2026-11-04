@@ -17,13 +17,18 @@ mvn test
 
 ## Source layout
 
-- `model` contains notes, chords, and the loaded song.
+- `model` contains notes, chords, and song state; `MidiSongAnalyzer` imports MIDI,
+  reads metadata, identifies chords, and writes the generated chord lyrics.
 - `player` contains MIDI playback.
 - `ui` contains JavaFX windows, controls, and displays.
 - `controller` connects user actions to the model and player.
 
 The playback controls include play/pause, restart, a 10-second rewind, and a
 timeline that can be clicked or dragged to seek through a MIDI file.
+Use **Chord analysis** to switch between Detailed mode, which shows every
+recognized chord-quality change, and Steady mode, which keeps the first chord
+quality until the root changes. The selected mode can be changed while a song
+is loaded; playback position and chord edits are preserved.
 
 ## Run
 

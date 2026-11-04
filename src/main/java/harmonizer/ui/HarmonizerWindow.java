@@ -3,6 +3,7 @@ package harmonizer.ui;
 import java.io.File;
 import java.util.Locale;
 
+import harmonizer.model.ChordAnalysisMode;
 import harmonizer.model.Song;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
@@ -12,7 +13,9 @@ import javafx.scene.control.Label;
 import javafx.scene.control.Menu;
 import javafx.scene.control.MenuBar;
 import javafx.scene.control.MenuItem;
+import javafx.scene.control.RadioMenuItem;
 import javafx.scene.control.Separator;
+import javafx.scene.control.ToggleGroup;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
@@ -31,6 +34,7 @@ public final class HarmonizerWindow {
 		void playPause();
 		void rewind();
 		void restart();
+		void changeAnalysisMode(ChordAnalysisMode mode);
 	}
 
 	private final Stage stage;
@@ -41,6 +45,8 @@ public final class HarmonizerWindow {
 	private final VBox loadedState;
 	private final MenuItem saveMenuItem = new MenuItem("Save");
 	private final MenuItem uniqueChordsMenuItem = new MenuItem("Show unique chords");
+	private final RadioMenuItem detailedAnalysisItem = new RadioMenuItem("Detailed (show chord qualities)");
+	private final RadioMenuItem steadyAnalysisItem = new RadioMenuItem("Steady (hold quality while root stays)");
 	private final Button showChordsButton = new Button("Unique chords");
 	private final Button editChordButton = new Button("Edit chord");
 	private final Button playPauseButton = new Button("Play");
@@ -98,6 +104,11 @@ public final class HarmonizerWindow {
 		restartButton.setDisable(!loaded);
 	}
 
+	public void setAnalysisMode(ChordAnalysisMode mode) {
+		detailedAnalysisItem.setSelected(mode == ChordAnalysisMode.DETAILED);
+		steadyAnalysisItem.setSelected(mode == ChordAnalysisMode.STEADY);
+	}
+
 	private VBox createHeader() {
 		MenuItem openMenuItem = new MenuItem("Open MIDI...");
 		openMenuItem.setOnAction(event -> chooseMidiFile(false));
@@ -113,7 +124,16 @@ public final class HarmonizerWindow {
 		uniqueChordsMenuItem.setOnAction(event -> actions.showUniqueChords());
 		viewMenu.getItems().add(uniqueChordsMenuItem);
 
-		MenuBar menuBar = new MenuBar(fileMenu, viewMenu);
+		ToggleGroup analysisModes = new ToggleGroup();
+		detailedAnalysisItem.setToggleGroup(analysisModes);
+		steadyAnalysisItem.setToggleGroup(analysisModes);
+		detailedAnalysisItem.setSelected(true);
+		detailedAnalysisItem.setOnAction(event -> actions.changeAnalysisMode(ChordAnalysisMode.DETAILED));
+		steadyAnalysisItem.setOnAction(event -> actions.changeAnalysisMode(ChordAnalysisMode.STEADY));
+		Menu analysisMenu = new Menu("Chord analysis");
+		analysisMenu.getItems().addAll(detailedAnalysisItem, steadyAnalysisItem);
+
+		MenuBar menuBar = new MenuBar(fileMenu, viewMenu, analysisMenu);
 		Label appName = new Label("Harmonizer");
 		appName.getStyleClass().add("app-title");
 		songTitle.getStyleClass().add("song-title");

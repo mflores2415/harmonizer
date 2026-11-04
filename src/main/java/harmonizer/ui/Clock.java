@@ -3,7 +3,7 @@ package harmonizer.ui;
 import java.util.Locale;
 import java.util.function.Consumer;
 
-import harmonizer.player.MusicPlayer;
+import harmonizer.player.MusicPlayback;
 import harmonizer.player.PlaybackUpdate;
 import javafx.animation.KeyFrame;
 import javafx.animation.Timeline;
@@ -24,13 +24,13 @@ public final class Clock {
 	private final Label elapsedTime = new Label("00:00");
 	private final Label totalTime = new Label("00:00");
 	private final Timeline refreshTimeline;
-	private final MusicPlayer musicPlayer;
+	private final MusicPlayback musicPlayback;
 	private long durationMicroseconds;
 	private boolean updatingSlider;
 	private Consumer<Boolean> playingListener = playing -> { };
 
-	public Clock(MusicPlayer musicPlayer) {
-		this.musicPlayer = musicPlayer;
+	public Clock(MusicPlayback musicPlayback) {
+		this.musicPlayback = musicPlayback;
 		timeline.setDisable(true);
 		timeline.setMaxWidth(Double.MAX_VALUE);
 		timeline.setAccessibleText("Song position");
@@ -101,7 +101,7 @@ public final class Clock {
 	}
 
 	private void updateFromPlayer() {
-		update(musicPlayer.getPlaybackUpdate());
+		update(musicPlayback.getPlaybackUpdate());
 	}
 
 	private void seekToSliderPosition() {
@@ -110,7 +110,7 @@ public final class Clock {
 		}
 		long position = toMicroseconds(timeline.getValue(), durationMicroseconds);
 		elapsedTime.setText(formatTime(position));
-		musicPlayer.seekToMicroseconds(position);
+		musicPlayback.seekToMicroseconds(position);
 	}
 
 	public static String formatTime(long microseconds) {

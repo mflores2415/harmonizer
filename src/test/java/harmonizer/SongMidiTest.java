@@ -1,8 +1,11 @@
 package harmonizer;
 
 import harmonizer.model.Song;
+import harmonizer.model.ChordAnalysisMode;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.nio.charset.StandardCharsets;
@@ -28,6 +31,8 @@ class SongMidiTest {
 		Song song = new Song(midiFile);
 
 		assertTrue(song.getMap().values().stream().anyMatch(chord -> chord.getName().equals("Cmaj")));
+		assertEquals(-1, song.getNextTick(song.getFirstTick()));
+		assertTrue(hasLyric(song.getSequence(), song.getFirstTick(), "Cmaj END"));
 	}
 
 	@Test
@@ -43,6 +48,151 @@ class SongMidiTest {
 		assertTrue(hasLyric(song.getSequence(), chordTick, "Dmaj END"));
 	}
 
+	@Test
+	void emptySongHasNoChordTicks() throws Exception {
+		Path midiFile = tempDir.resolve("empty.mid");
+		Sequence sequence = new Sequence(Sequence.PPQ, 480);
+		sequence.createTrack();
+		MidiSystem.write(sequence, 1, midiFile.toFile());
+
+		Song song = new Song(midiFile);
+
+		assertTrue(song.getMap().isEmpty());
+		assertEquals(-1, song.getFirstTick());
+		assertEquals(-1, song.getChordTickAt(0));
+		assertEquals(-1, song.getPrevTick(0));
+		assertEquals(-1, song.getNextTick(0));
+	}
+
+	@Test
+	void chordMapCannotBeModifiedOutsideSong() throws Exception {
+		Song song = new Song(createChordMidi("read-only-chords.mid"));
+		var chord = song.getMap().values().iterator().next();
+
+		assertThrows(UnsupportedOperationException.class, () -> song.getMap().put(100L, chord));
+	}
+
+	@Test
+	void chordNavigationHandlesTicksOutsideTheSong() throws Exception {
+		Song song = new Song(createChordMidi("chord-navigation.mid"));
+		long firstTick = song.getFirstTick();
+
+		assertEquals(firstTick, song.getChordTickAt(firstTick - 1));
+		assertEquals(-1, song.getPrevTick(firstTick));
+		assertEquals(-1, song.getNextTick(Long.MAX_VALUE));
+	}
+
+	@Test
+	void importsMidiMetadataAndUsesItsKeyForChordSpelling() throws Exception {
+		Path midiFile = tempDir.resolve("metadata.mid");
+		Sequence sequence = new Sequence(Sequence.PPQ, 480);
+		var track = sequence.createTrack();
+		addMeta(track, 3, "Metadata Test".getBytes(StandardCharsets.UTF_8), 0);
+		addMeta(track, 0x51, new byte[] { 0x07, (byte) 0xA1, 0x20 }, 0);
+		addMeta(track, 0x58, new byte[] { 4, 2, 24, 8 }, 0);
+		addMeta(track, 0x59, new byte[] { -5, 0 }, 0);
+		addNote(track, ShortMessage.NOTE_ON, 61, 100, 0);
+		addNote(track, ShortMessage.NOTE_ON, 65, 100, 0);
+		addNote(track, ShortMessage.NOTE_ON, 68, 100, 0);
+		addNote(track, ShortMessage.NOTE_OFF, 61, 0, 480);
+		addNote(track, ShortMessage.NOTE_OFF, 65, 0, 480);
+		addNote(track, ShortMessage.NOTE_OFF, 68, 0, 480);
+		MidiSystem.write(sequence, 1, midiFile.toFile());
+
+		Song song = new Song(midiFile);
+
+		assertEquals("Metadata Test", song.getName());
+		assertEquals(120, song.getTempo());
+		assertEquals("4 / 4", song.getTimeSignature());
+		assertEquals("Db major", song.getKey());
+		assertTrue(song.isFlatKey());
+		assertTrue(song.getMap().values().stream().anyMatch(chord -> chord.getName().equals("Dbmaj")));
+		assertTrue(hasLyric(song.getSequence(), song.getFirstTick(), "Dbmaj END"));
+	}
+
+	@Test
+	void chordLyricsShowCurrentAndUpcomingChordsAtTheirStartTicks() throws Exception {
+		Path midiFile = tempDir.resolve("chord-transition.mid");
+		Sequence sequence = new Sequence(Sequence.PPQ, 480);
+		var track = sequence.createTrack();
+		addTriad(track, 60, 64, 67, 0, 480);
+		addTriad(track, 62, 65, 69, 480, 960);
+		MidiSystem.write(sequence, 1, midiFile.toFile());
+
+		Song song = new Song(midiFile);
+		long firstChordTick = song.getFirstTick();
+		long secondChordTick = song.getNextTick(firstChordTick);
+
+		assertEquals("Cmaj", song.getMap().get(firstChordTick).getName());
+		assertEquals("Dmin", song.getMap().get(secondChordTick).getName());
+		assertTrue(hasLyric(song.getSequence(), firstChordTick, "Cmaj Dmin"));
+		assertTrue(hasLyric(song.getSequence(), secondChordTick, "Dmin END"));
+	}
+
+	@Test
+	void steadyModeKeepsTheFirstQualityUntilTheRootChanges() throws Exception {
+		Path midiFile = createSameRootQualityChangeMidi();
+
+		Song detailed = new Song(midiFile, ChordAnalysisMode.DETAILED);
+		Song steady = new Song(midiFile, ChordAnalysisMode.STEADY);
+
+		assertEquals(2, detailed.getMap().size());
+		assertEquals("Cmaj", detailed.getMap().values().iterator().next().getName());
+		assertEquals("Cmin", detailed.getMap().values().stream().skip(1).findFirst().orElseThrow().getName());
+		assertEquals(1, steady.getMap().size());
+		assertEquals("Cmaj", steady.getMap().values().iterator().next().getName());
+		assertTrue(hasLyric(steady.getSequence(), steady.getFirstTick(), "Cmaj END"));
+	}
+
+	@Test
+	void switchingAnalysisModeKeepsChordEdits() throws Exception {
+		Song song = new Song(createSameRootQualityChangeMidi(), ChordAnalysisMode.DETAILED);
+		long tick = song.getFirstTick();
+
+		song.editChord(tick, "Dmaj Cmin", "Cmaj Cmin", -1, "", "");
+		song.setAnalysisMode(ChordAnalysisMode.STEADY);
+		assertEquals("Dmaj", song.getMap().get(tick).getName());
+		assertTrue(hasLyric(song.getSequence(), tick, "Dmaj END"));
+
+		song.setAnalysisMode(ChordAnalysisMode.DETAILED);
+		assertEquals("Dmaj", song.getMap().get(tick).getName());
+	}
+
+	@Test
+	void steadyModeRemovesGeneratedLyricsForFilteredChordChanges() throws Exception {
+		Song detailed = new Song(createSameRootQualityChangeMidi(), ChordAnalysisMode.DETAILED);
+		long filteredChordTick = detailed.getNextTick(detailed.getFirstTick());
+		Path analyzedFile = tempDir.resolve("analyzed-chords.mid");
+		MidiSystem.write(detailed.getSequence(), 1, analyzedFile.toFile());
+
+		Song steady = new Song(analyzedFile, ChordAnalysisMode.STEADY);
+
+		assertEquals(1, steady.getMap().size());
+		assertTrue(hasLyric(steady.getSequence(), steady.getFirstTick(), "Cmaj END"));
+		assertFalse(hasLyric(steady.getSequence(), filteredChordTick, "Cmin END"));
+	}
+
+	@Test
+	void identifiesChordFromNotesAcrossTracksAndKeepsItWhileNotesOverlap() throws Exception {
+		Path midiFile = tempDir.resolve("overlapping-tracks.mid");
+		Sequence sequence = new Sequence(Sequence.PPQ, 480);
+		var firstTrack = sequence.createTrack();
+		var secondTrack = sequence.createTrack();
+		addNote(firstTrack, ShortMessage.NOTE_ON, 60, 100, 0);
+		addNote(firstTrack, ShortMessage.NOTE_OFF, 60, 0, 480);
+		addNote(secondTrack, ShortMessage.NOTE_ON, 64, 100, 0);
+		addNote(secondTrack, ShortMessage.NOTE_ON, 67, 100, 0);
+		addNote(secondTrack, ShortMessage.NOTE_OFF, 64, 0, 960);
+		addNote(secondTrack, ShortMessage.NOTE_OFF, 67, 0, 960);
+		MidiSystem.write(sequence, 1, midiFile.toFile());
+
+		Song song = new Song(midiFile);
+
+		assertEquals(1, song.getMap().size());
+		assertEquals("Cmaj", song.getMap().values().iterator().next().getName());
+		assertEquals(0, song.getMap().keySet().iterator().next());
+	}
+
 	private Path createChordMidi(String fileName) throws Exception {
 		Path midiFile = tempDir.resolve(fileName);
 		Sequence sequence = new Sequence(Sequence.PPQ, 480);
@@ -50,9 +200,19 @@ class SongMidiTest {
 		addNote(track, ShortMessage.NOTE_ON, 60, 100, 0);
 		addNote(track, ShortMessage.NOTE_ON, 64, 100, 0);
 		addNote(track, ShortMessage.NOTE_ON, 67, 100, 0);
-		addNote(track, ShortMessage.NOTE_OFF, 60, 0, 480);
-		addNote(track, ShortMessage.NOTE_OFF, 64, 0, 480);
-		addNote(track, ShortMessage.NOTE_OFF, 67, 0, 480);
+		addNote(track, ShortMessage.NOTE_ON, 60, 0, 480);
+		addNote(track, ShortMessage.NOTE_ON, 64, 0, 480);
+		addNote(track, ShortMessage.NOTE_ON, 67, 0, 480);
+		MidiSystem.write(sequence, 1, midiFile.toFile());
+		return midiFile;
+	}
+
+	private Path createSameRootQualityChangeMidi() throws Exception {
+		Path midiFile = tempDir.resolve("same-root-quality-change.mid");
+		Sequence sequence = new Sequence(Sequence.PPQ, 480);
+		var track = sequence.createTrack();
+		addTriad(track, 60, 64, 67, 0, 480);
+		addTriad(track, 60, 63, 67, 480, 960);
 		MidiSystem.write(sequence, 1, midiFile.toFile());
 		return midiFile;
 	}
@@ -69,6 +229,27 @@ class SongMidiTest {
 			}
 		}
 		return false;
+	}
+
+	private void addMeta(javax.sound.midi.Track track, int type, byte[] data, long tick) throws Exception {
+		MetaMessage message = new MetaMessage();
+		message.setMessage(type, data, data.length);
+		track.add(new MidiEvent(message, tick));
+	}
+
+	private void addTriad(
+			javax.sound.midi.Track track,
+			int root,
+			int third,
+			int fifth,
+			long startTick,
+			long endTick) throws Exception {
+		addNote(track, ShortMessage.NOTE_ON, root, 100, startTick);
+		addNote(track, ShortMessage.NOTE_ON, third, 100, startTick);
+		addNote(track, ShortMessage.NOTE_ON, fifth, 100, startTick);
+		addNote(track, ShortMessage.NOTE_OFF, root, 0, endTick);
+		addNote(track, ShortMessage.NOTE_OFF, third, 0, endTick);
+		addNote(track, ShortMessage.NOTE_OFF, fifth, 0, endTick);
 	}
 
 	private void addNote(javax.sound.midi.Track track, int command, int pitch, int velocity, long tick)

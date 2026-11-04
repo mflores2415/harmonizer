@@ -16,7 +16,7 @@ import org.junit.jupiter.api.Test;
 class MusicPlayerTest {
 	@Test
 	void seeksAndClampsPositionToTheSongDuration() throws Exception {
-		MusicPlayer player;
+		MusicPlayback player;
 		try {
 			player = new MusicPlayer();
 		} catch (IllegalStateException exception) {
