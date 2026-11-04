@@ -1,4 +1,4 @@
-package cos210.finalproject.iface;
+package harmonizer.player;
 
 public interface IPlayable {
 	public void play();

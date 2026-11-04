@@ -1,4 +1,4 @@
-package cos210.finalproject;
+package harmonizer.ui;
 
 import java.awt.Color;
 import java.awt.Dimension;
@@ -12,6 +12,9 @@ import javax.swing.JFrame;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.border.Border;
+
+import harmonizer.model.Chord;
+import harmonizer.model.Song;
 
 public class UniqueChordWindow {
 	private final int NUM_COL = 5;

@@ -1,15 +1,14 @@
-package cos210.finalproject;
+package harmonizer.model;
 
-import java.math.BigInteger;
-import java.util.HashSet;
+import java.util.Objects;
 import java.util.Set;
 
 public class Chord {
 	private String name = null;
 	private String type = null;
 	private int root = 0;
-	private Set<Note> notes = new HashSet<Note>();
-	private boolean flatKey;
+	private final Set<Note> notes;
+	private final boolean flatKey;
 	private static final int[] noteValues = {
 			1,2,4,8,16,32,64,128,256,512,1024,2048
 	};
@@ -20,9 +19,21 @@ public class Chord {
 			"C", "Db", "D", "Eb", "E", "F", "Gb", "G", "Ab", "A", "Bb", "B"
 	};
 	public Chord(Set<Note> notes, boolean flatKey) {
-		this.notes = notes;
+		this.notes = Set.copyOf(notes);
 		this.flatKey = flatKey;
 		analyze();
+	}
+
+	private Chord(Chord chord, String name) {
+		this.notes = chord.notes;
+		this.flatKey = chord.flatKey;
+		this.root = chord.root;
+		this.type = chord.type;
+		this.name = name;
+	}
+
+	public Chord withName(String name) {
+		return new Chord(this, name);
 	}
 	private void analyze() {
 		int noteTotal = 0;
@@ -334,7 +345,7 @@ public class Chord {
 				this.type = "rr";
 				break;
 		}		
-		this.name = toString();
+		this.name = (this.flatKey ? noteNamesFlat[this.root] : noteNamesSharp[this.root]) + this.type;
 
 	}
 	
@@ -342,20 +353,16 @@ public class Chord {
 		return this.name;
 	}
 	
-	public void setName(String name) {
-		this.name = name;
-	}
-	
 	public String toString() {
-		return (this.flatKey ? noteNamesFlat[this.root] + this.type : noteNamesSharp[this.root] + this.type);
+		return this.name;
 	}
 	@Override
 	public boolean equals(Object obj) {
-		return obj.toString().equals(this.toString());
+		return this == obj || obj instanceof Chord other && Objects.equals(this.name, other.name);
 	}
 	@Override
 	public int hashCode() {	
-		return (int) new BigInteger(this.toString().getBytes()).intValue();
+		return Objects.hashCode(this.name);
 	}
 	
 	

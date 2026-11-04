@@ -1,4 +1,6 @@
-package cos210.finalproject;
+package harmonizer.ui;
+
+import harmonizer.model.Song;
 
 import java.awt.FlowLayout;
 import java.awt.event.ActionEvent;
@@ -10,12 +12,14 @@ import javax.swing.JComboBox;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
+import java.util.function.Consumer;
 
 public class EditChordWindow  { 
 		
 		private String currentChord;
 		private String oldChords;
 		private Song song;
+		private Consumer<String> chordEdited;
 		private long currentTick;
 		private long prevTick;
 		private JComboBox<String> listRoot;
@@ -30,13 +34,13 @@ public class EditChordWindow  {
 		private static final String[] noteNamesFlat = {
 				"C", "Db", "D", "Eb", "E", "F", "Gb", "G", "Ab", "A", "Bb", "B"
 		};
-		public EditChordWindow(long currentTick, Song song, String oldChords) {
+		public EditChordWindow(long currentTick, Song song, String oldChords, Consumer<String> chordEdited) {
 			this.song = song;
-			this.currentTick = currentTick;
-			this.prevTick = this.song.getPrevTick(currentTick);
+			this.chordEdited = chordEdited;
+			this.currentTick = this.song.getChordTickAt(currentTick);
+			this.prevTick = this.song.getPrevTick(this.currentTick);
 			this.prevChord = null;
 			if (prevTick != -1) this.prevChord = this.song.getMap().get(this.prevTick).getName();
-			if(currentTick == 0)  this.currentTick = this.song.getFirstTick();
 			this.currentChord = this.song.getMap().get(this.currentTick).getName();
 			this.oldChords = oldChords;
 			this.currentRoot = this.currentChord.split("m")[0];
@@ -44,7 +48,6 @@ public class EditChordWindow  {
 			drawWindow();
 			
 		}
-		@SuppressWarnings("serial")
 		public void drawWindow() {
 			jf = new JFrame("Edit Chord WIndow");
 			JPanel panelMain = new JPanel();
@@ -96,7 +99,7 @@ public class EditChordWindow  {
 			String newChords = (String) this.listRoot.getSelectedItem() + this.listType.getSelectedItem() + " " + oldChords.split(" ")[1];
 			String prevChords = this.prevChord + " " + this.listRoot.getSelectedItem() + this.listType.getSelectedItem();
 			this.song.editChord(currentTick, newChords, oldChords, prevTick, this.prevChord + " " + currentChord, prevChords);
+			chordEdited.accept(newChords);
 			jf.dispose();
 		}
 	}
-

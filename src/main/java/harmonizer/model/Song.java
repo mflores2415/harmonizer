@@ -1,7 +1,7 @@
-package cos210.finalproject;
+package harmonizer.model;
 
-import java.io.File;
 import java.io.UnsupportedEncodingException;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
@@ -21,7 +21,6 @@ public class Song{
 	private Map<Long, Chord> chords = new TreeMap<Long, Chord>();
 	private int length = 0;
 	private String fileName = null;
-	private String fileDir = null;
 	private Sequence sequence = null;
 	private String name = null;
 	private int tempo = 0;
@@ -29,14 +28,11 @@ public class Song{
 	private String keySignature = "Unknown";
 	private Track track = null;
 	private ArrayList<Long> ticks = new ArrayList<Long>();
-	private ChordDisplay cd = null;
 	private boolean isAnalyzed = false;
 	private boolean keyFlat;
-	public Song(String fileName, String fileDir, ChordDisplay cd) throws Exception {
-		this.fileName = fileName;
-		this.fileDir = fileDir;
-		importMidi(this.fileName, this.fileDir);
-		this.cd = cd;
+	public Song(Path midiFile) throws Exception {
+		this.fileName = midiFile.getFileName().toString();
+		importMidi(midiFile);
 	}
 	
 	public String getName() {
@@ -62,16 +58,30 @@ public class Song{
 	}
 
 	public void editChord(long tick, String newChords, String oldChords, long prevTick, String oldPrevChords, String prevChords) {
-		chords.get(tick).setName(name);
-		this.track.remove(new MidiEvent(makeMessageSingle(5, oldChords), tick));
-		this.track.add(new MidiEvent(makeMessageSingle(5, newChords), tick));
-		if(prevTick != -1) {
-			this.track.remove(new MidiEvent(makeMessageSingle(5, oldPrevChords), prevTick));
-			this.track.add(new MidiEvent(makeMessageSingle(5, prevChords), prevTick));
+		Chord chord = chords.get(tick);
+		if (chord != null) {
+			chords.put(tick, chord.withName(newChords.split(" ", 2)[0]));
 		}
-		this.cd.set(newChords);
+		replaceLyric(tick, oldChords, newChords);
+		if(prevTick != -1) {
+			replaceLyric(prevTick, oldPrevChords, prevChords);
+		}
+	}
 
-		
+	private void replaceLyric(long tick, String oldText, String newText) {
+		for (int index = track.size() - 1; index >= 0; index--) {
+			MidiEvent event = track.get(index);
+			if (event.getTick() != tick || !(event.getMessage() instanceof MetaMessage message)
+					|| message.getType() != 5) {
+				continue;
+			}
+			String eventText = new String(message.getData(), java.nio.charset.StandardCharsets.UTF_8);
+			if (eventText.equals(oldText)) {
+				track.remove(event);
+				break;
+			}
+		}
+		track.add(new MidiEvent(makeMessageSingle(5, newText), tick));
 	}
 	public Set<Chord> getChords() {
 		Set<Chord> uniqueChords = new HashSet<Chord>();		
@@ -80,9 +90,8 @@ public class Song{
 		return uniqueChords;
 	}
 	
-	public void importMidi(String filename, String filedir) throws Exception {
-		File file = new File(this.fileDir + this.fileName);
-		this.sequence = MidiSystem.getSequence(file);
+	private void importMidi(Path midiFile) throws Exception {
+		this.sequence = MidiSystem.getSequence(midiFile.toFile());
 		analyzeMidi();
 
 	}
@@ -128,7 +137,8 @@ public class Song{
 							}
 							break;
 						case 88:
-							this.timeSignature = new Integer(metaData[0]).toString() + " / " + new Integer((int) Math.pow(2, metaData[1])).toString();
+							this.timeSignature = Integer.toString(metaData[0]) + " / "
+									+ Integer.toString((int) Math.pow(2, metaData[1]));
 							break;
 						case 89:
 							switch (metaData[0]) {
@@ -299,6 +309,16 @@ public class Song{
 		}		
 	}
 	
+	/**
+	 * Returns the tick of the chord playing at {@code tick}: the closest chord
+	 * start at or before it, or the first chord if {@code tick} is before all of them.
+	 */
+	public long getChordTickAt(long tick) {
+		TreeMap<Long, Chord> map = (TreeMap<Long, Chord>) this.chords;
+		Long key = map.floorKey(tick);
+		return key != null ? key : getFirstTick();
+	}
+
 	public long getFirstTick() {
 		return this.ticks.get(0);
 	}
