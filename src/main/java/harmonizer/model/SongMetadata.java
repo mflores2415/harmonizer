@@ -11,7 +11,7 @@ import harmonizer.midi.Midi;
 /**
  * Information stored in a MIDI file's meta events.
  *
- * @param name         the song's name (its last track-name event), or null
+ * @param name         the song's title, or null if the file has none
  * @param tempo        tempo in BPM, or 0 if the file doesn't say
  * @param keySignature the file's key signature, if any
  * @param analyzed     true if Harmonizer has already added chord lyrics to this file
@@ -21,7 +21,7 @@ record SongMetadata(String name, int tempo, Optional<KeySignature> keySignature,
 	static final String ANALYZED_MARKER = "Harm Analyzed";
 
 	static SongMetadata read(Sequence sequence) {
-		String name = null;
+		String name = title(sequence);
 		int tempo = 0;
 		Optional<KeySignature> keySignature = Optional.empty();
 		boolean analyzed = false;
@@ -31,7 +31,6 @@ record SongMetadata(String name, int tempo, Optional<KeySignature> keySignature,
 					continue;
 				}
 				switch (message.getType()) {
-					case Midi.META_TRACK_NAME -> name = Midi.text(message);
 					case Midi.META_TEXT -> analyzed |= ANALYZED_MARKER.equals(Midi.text(message));
 					case Midi.META_TEMPO -> tempo = parseTempo(message.getData(), tempo);
 					case Midi.META_KEY_SIGNATURE -> {
@@ -46,6 +45,16 @@ record SongMetadata(String name, int tempo, Optional<KeySignature> keySignature,
 			}
 		}
 		return new SongMetadata(name, tempo, keySignature, analyzed);
+	}
+
+	/**
+	 * By MIDI file convention the first track's name is the song's title; later tracks name
+	 * their instruments.
+	 */
+	private static String title(Sequence sequence) {
+		Track[] tracks = sequence.getTracks();
+		String title = tracks.length == 0 ? "" : Midi.trackName(tracks[0]);
+		return title.isBlank() ? null : title;
 	}
 
 	private static int parseTempo(byte[] data, int fallback) {
