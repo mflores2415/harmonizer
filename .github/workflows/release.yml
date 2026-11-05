@@ -1,0 +1,52 @@
+name: Release
+
+# Push a tag like v1.2.0 to build Windows, macOS and Linux apps and publish them as a
+# GitHub Release. Running the workflow by hand builds the apps without publishing.
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+jobs:
+  package:
+    strategy:
+      matrix:
+        os: [windows-latest, macos-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 25
+          cache: maven
+      - name: Test
+        run: mvn -B verify
+      - name: Package app
+        shell: bash
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          [[ "$version" =~ ^[0-9]+(\.[0-9]+)*$ ]] || version=1.0.0
+          scripts/package.sh "$version"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: harmonizer-${{ matrix.os }}
+          path: |
+            target/dist/*.zip
+            target/dist/*.tar.gz
+
+  publish:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: package
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*
+          generate_release_notes: true

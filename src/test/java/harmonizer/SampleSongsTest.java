@@ -11,6 +11,7 @@ import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.MethodSource;
 
 import harmonizer.model.ChordAnalysisMode;
@@ -22,6 +23,8 @@ class SampleSongsTest {
 
 	static Stream<Arguments> samples() {
 		return Stream.of(
+				Arguments.of("ode-to-joy.mid", "D major", false, "4 / 4"),
+				Arguments.of("greensleeves.mid", "A minor", false, "3 / 4"),
 				Arguments.of("encourage.mid", "G major", true, "4 / 4"),
 				Arguments.of("ww.mid", "G minor", true, "4 / 4"),
 				Arguments.of("wwiwiwo.mid", "G minor", true, "4 / 4"),
@@ -49,6 +52,24 @@ class SampleSongsTest {
 		Song song = Song.load(SAMPLES.resolve(file));
 		boolean hasPitchedNotes = song.getInstrumentParts().stream().anyMatch(part -> !part.isPercussion());
 		assertEquals(hasPitchedNotes, song.hasChords());
+	}
+
+	@ParameterizedTest(name = "{0}")
+	@CsvSource(delimiter = '|', value = {
+			"ode-to-joy.mid | Ode to Joy",
+			"greensleeves.mid | Greensleeves",
+			"Movie_Themes_-_Ghostbusters.mid | Ghost Busters Theme",
+			"fg.mid | Family guy theme song",
+			"march.mid | Monty Python Theme",
+			"ww.mid | Who Walks in When I Walk Out",
+			"encourage.mid | *Encouragement"})
+	void usesTheFirstTracksNameAsTheTitle(String file, String title) throws Exception {
+		assertEquals(title, Song.load(SAMPLES.resolve(file)).getName());
+	}
+
+	@Test
+	void songWithoutTrackNamesHasNoTitle() throws Exception {
+		assertEquals(null, Song.load(SAMPLES.resolve("drums.mid")).getName());
 	}
 
 	@Test

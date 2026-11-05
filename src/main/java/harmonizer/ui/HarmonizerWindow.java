@@ -1,8 +1,11 @@
 package harmonizer.ui;
 
 import java.io.File;
+import java.net.URISyntaxException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
 
@@ -50,7 +53,6 @@ public final class HarmonizerWindow {
 		void changeInstrumentView(boolean enabled);
 	}
 
-	private static final Path SAMPLES_FOLDER = Path.of("samples");
 
 	private final Stage stage;
 	private final Actions actions;
@@ -304,10 +306,24 @@ public final class HarmonizerWindow {
 		chooser.setTitle(title);
 		chooser.getExtensionFilters().add(new FileChooser.ExtensionFilter(
 				"MIDI/Karaoke files (*.mid, *.midi, *.kar)", "*.mid", "*.midi", "*.kar"));
-		if (Files.isDirectory(SAMPLES_FOLDER)) {
-			chooser.setInitialDirectory(SAMPLES_FOLDER.toAbsolutePath().toFile());
-		}
+		samplesFolder().ifPresent(folder -> chooser.setInitialDirectory(folder.toFile()));
 		return chooser;
+	}
+
+	/**
+	 * The sample songs: {@code samples/} in the working directory when run from the project,
+	 * or next to the application jar in the packaged app.
+	 */
+	private static Optional<Path> samplesFolder() {
+		List<Path> candidates = new ArrayList<>();
+		candidates.add(Path.of("samples"));
+		try {
+			Path codeSource = Path.of(HarmonizerWindow.class.getProtectionDomain().getCodeSource().getLocation().toURI());
+			candidates.add(codeSource.resolveSibling("samples"));
+		} catch (URISyntaxException | SecurityException | NullPointerException exception) {
+			// No code location available; the working directory is the only candidate.
+		}
+		return candidates.stream().filter(Files::isDirectory).map(Path::toAbsolutePath).findFirst();
 	}
 
 	private static File withMidiExtension(File file) {
