@@ -123,3 +123,9 @@ git push origin v1.0.0
 - `scripts/package.sh` – builds the self-contained app with `jpackage`.
 - `files/` – the original course documents (use cases, storyboard), a General MIDI
   instrument list, and the 2016 MIDI prototype this project grew out of.
+
+## License
+
+Harmonizer is released under the [MIT License](LICENSE). The demo songs in `samples/`
+are public-domain tunes. The course materials in `files/` are kept for reference and are
+not covered by the license.
