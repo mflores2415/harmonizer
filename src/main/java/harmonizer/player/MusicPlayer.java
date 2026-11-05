@@ -23,7 +23,11 @@ public final class MusicPlayer implements MusicPlayback, MetaEventListener {
 			"[A-G](?:#|b)?(?:maj|min|aug|dim|rr)(?:\\((?:m7|M7)\\))? "
 					+ "(?:[A-G](?:#|b)?(?:maj|min|aug|dim|rr)(?:\\((?:m7|M7)\\))?|END)");
 
+	public static final double MIN_SPEED = 0.1;
+	public static final double MAX_SPEED = 2.0;
+
 	private final Sequencer sequencer;
+	private double speed = 1.0;
 	private final NavigableMap<Long, String> chordLyrics = new TreeMap<>();
 	private Sequence sequence;
 	private Consumer<PlaybackUpdate> listener = update -> { };
@@ -64,6 +68,7 @@ public final class MusicPlayer implements MusicPlayback, MetaEventListener {
 		if (!sequencer.isOpen()) {
 			sequencer.open();
 		}
+		sequencer.setTempoFactor((float) speed);
 		sequencer.setMicrosecondPosition(0);
 		notifyListener();
 	}
@@ -139,6 +144,18 @@ public final class MusicPlayer implements MusicPlayback, MetaEventListener {
 		long boundedPosition = Math.max(0, Math.min(position, getDurationMicroseconds()));
 		sequencer.setMicrosecondPosition(boundedPosition);
 		notifyListener();
+	}
+
+	@Override
+	public void setSpeed(double speed) {
+		this.speed = Math.max(MIN_SPEED, Math.min(MAX_SPEED, speed));
+		sequencer.setTempoFactor((float) this.speed);
+		notifyListener();
+	}
+
+	@Override
+	public double getSpeed() {
+		return speed;
 	}
 
 	@Override

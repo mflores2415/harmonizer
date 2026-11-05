@@ -17,6 +17,7 @@ import harmonizer.ui.HarmonizerWindow;
 import harmonizer.ui.UniqueChordWindow;
 import javafx.application.Platform;
 import javafx.scene.control.Alert;
+import javafx.scene.control.ButtonType;
 import javafx.stage.Stage;
 
 public final class HarmonizerController implements HarmonizerWindow.Actions {
@@ -31,9 +32,10 @@ public final class HarmonizerController implements HarmonizerWindow.Actions {
 		this.musicPlayback = Objects.requireNonNull(musicPlayback, "musicPlayback");
 		clock = new Clock(musicPlayback);
 		window = new HarmonizerWindow(stage, this, chordDisplay, clock);
+		chordDisplay.setOnCorrectChordName(this::correctChordName);
 		clock.setUpdateListener(update -> {
 			if (song != null) {
-				window.setInstrumentParts(song.getInstrumentParts(), update.tick());
+				window.setInstrumentTick(update.tick(), update.playing());
 			}
 		});
 		musicPlayback.setListener(this::updatePlayback);
@@ -52,6 +54,13 @@ public final class HarmonizerController implements HarmonizerWindow.Actions {
 			chordDisplay.set("— —", 0);
 			window.setSongInfo(song);
 			window.setSongLoaded(true, !song.getMap().isEmpty());
+			window.setTranspose(0);
+			musicPlayback.setSpeed(1.0);
+			window.setSpeed(1.0, song.getTempo());
+			window.setInstrumentParts(
+					song.getInstrumentParts(),
+					song.getBarGrid(),
+					song.getSequence().getTickLength());
 			clock.reset();
 			updatePlayback(musicPlayback.getPlaybackUpdate());
 		} catch (Exception exception) {
@@ -82,7 +91,7 @@ public final class HarmonizerController implements HarmonizerWindow.Actions {
 	}
 
 	@Override
-	public void editChord() {
+	public void correctChordName() {
 		if (song != null && !song.getMap().isEmpty()) {
 			musicPlayback.pause();
 			EditChordWindow.show(
@@ -141,6 +150,51 @@ public final class HarmonizerController implements HarmonizerWindow.Actions {
 			window.setAnalysisMode(analysisMode);
 			showError(exception);
 		}
+	}
+
+	@Override
+	public void transpose(int semitones) {
+		if (song == null || semitones == song.getTranspose()) {
+			return;
+		}
+		int corrected = song.getCorrectedChordCount();
+		if (corrected > 0) {
+			Alert confirm = new Alert(Alert.AlertType.CONFIRMATION);
+			confirm.initOwner(window.getStage());
+			confirm.setTitle("Transpose song");
+			confirm.setHeaderText("Transposing will undo your chord name corrections");
+			confirm.setContentText("You corrected " + corrected + (corrected == 1 ? " chord name" : " chord names")
+					+ ". After transposing, chords are detected again in the new key.");
+			if (confirm.showAndWait().filter(ButtonType.OK::equals).isEmpty()) {
+				return;
+			}
+		}
+		long position = musicPlayback.getPositionMicroseconds();
+		boolean wasPlaying = musicPlayback.isPlaying();
+		try {
+			song.setTranspose(semitones);
+			musicPlayback.setSequence(song.getSequence());
+			musicPlayback.seekToMicroseconds(position);
+			window.setSongInfo(song);
+			window.setSongLoaded(true, !song.getMap().isEmpty());
+			window.setTranspose(song.getTranspose());
+			window.setInstrumentParts(
+					song.getInstrumentParts(),
+					song.getBarGrid(),
+					song.getSequence().getTickLength());
+			if (wasPlaying) {
+				musicPlayback.play();
+			}
+			updatePlayback(musicPlayback.getPlaybackUpdate());
+		} catch (Exception exception) {
+			showError(exception);
+		}
+	}
+
+	@Override
+	public void changeSpeed(double speed) {
+		musicPlayback.setSpeed(speed);
+		window.setSpeed(musicPlayback.getSpeed(), song == null ? 0 : song.getTempo());
 	}
 
 	@Override

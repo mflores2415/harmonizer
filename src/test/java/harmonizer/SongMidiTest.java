@@ -231,7 +231,51 @@ class SongMidiTest {
 		assertEquals(List.of(60, 64, 67), trumpet.getNotesAt(0));
 		assertEquals(List.of(60, 64, 67), trumpet.getNotesAt(240));
 		assertEquals(List.of(), trumpet.getNotesAt(480));
+		assertTrue(trumpet.getNotes().stream()
+				.allMatch(note -> note.startTick() == 0 && note.endTick() == 480));
 		assertEquals("C4", InstrumentPart.formatNote(60));
+	}
+
+	@Test
+	void transposingMovesNotesChordsAndKeyButNotDrums() throws Exception {
+		Path midiFile = tempDir.resolve("transpose.mid");
+		Sequence sequence = new Sequence(Sequence.PPQ, 480);
+		var track = sequence.createTrack();
+		addMeta(track, 0x59, new byte[] {0, 0}, 0);
+		addTriad(track, 60, 64, 67, 0, 480);
+		ShortMessage drumOn = new ShortMessage();
+		drumOn.setMessage(ShortMessage.NOTE_ON, 9, 38, 100);
+		track.add(new MidiEvent(drumOn, 0));
+		ShortMessage drumOff = new ShortMessage();
+		drumOff.setMessage(ShortMessage.NOTE_OFF, 9, 38, 0);
+		track.add(new MidiEvent(drumOff, 120));
+		MidiSystem.write(sequence, 1, midiFile.toFile());
+
+		Song song = new Song(midiFile);
+		long chordTick = song.getFirstTick();
+		song.editChord(chordTick, "Amin END", "Cmaj END", -1, "", "");
+		assertEquals(1, song.getCorrectedChordCount());
+
+		song.setTranspose(2);
+
+		assertEquals(2, song.getTranspose());
+		assertEquals("D major", song.getKey());
+		assertEquals(0, song.getCorrectedChordCount());
+		assertEquals("Dmaj", song.getMap().get(song.getFirstTick()).getName());
+		InstrumentPart pitched = song.getInstrumentParts().stream()
+				.filter(part -> !part.isPercussion()).findFirst().orElseThrow();
+		InstrumentPart drums = song.getInstrumentParts().stream()
+				.filter(InstrumentPart::isPercussion).findFirst().orElseThrow();
+		assertEquals(List.of(62, 66, 69), pitched.getNotesAt(0));
+		assertEquals(List.of(38), drums.getNotesAt(0));
+
+		song.setTranspose(-1);
+		assertEquals("B major", song.getKey());
+		assertEquals("Bmaj", song.getMap().get(song.getFirstTick()).getName());
+
+		song.setTranspose(0);
+		assertEquals("C major", song.getKey());
+		assertEquals("Cmaj", song.getMap().get(song.getFirstTick()).getName());
 	}
 
 	private Path createChordMidi(String fileName) throws Exception {

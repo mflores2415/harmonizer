@@ -28,13 +28,28 @@ timeline that can be clicked or dragged to seek through a MIDI file.
 Karaoke `.kar` files can be opened alongside `.mid` and `.midi` files; their
 existing lyrics are preserved, while Harmonizer displays its generated chord
 labels during playback.
-Use **Display → Instruments** to see each MIDI instrument part and the notes
-sounding at the playhead. The list follows playback and seeking; **Display →
-Chords** returns to the chord cards.
-Use **Chord analysis** to switch between Detailed mode, which shows every
-recognized chord-quality change, and Steady mode, which keeps the first chord
-quality until the root changes. The selected mode can be changed while a song
-is loaded; playback position and chord edits are preserved.
+Use **View → Instruments** to choose an instrument part and see its notes on a
+piano roll: a fixed playhead with notes scrolling past, a keyboard that lights
+up the sounding pitches, and drum parts labeled by drum name. Scroll over the
+roll to zoom. **View → Chords** returns to the chord cards.
+
+**Speed** (in the player bar) slows playback down to practice: 25%, 50%, 75%,
+100%, 125% or 150%, or **Custom tempo…** to type any BPM from 10% to 200% of
+the song's tempo. Pitch stays the same and the saved file is not changed.
+
+**Transpose** (next to the song details, or **Song → Transpose**, Ctrl+Up/Down)
+shifts every pitched note of the song up or down by semitones. This changes
+what you hear, the detected chords and key, and what gets saved; drums are not
+affected.
+
+**Chords → Correct chord name…** (or right-click the chord cards) fixes a chord
+the detector named wrongly. It only changes the name shown and saved with the
+file, not the music. Corrections are cleared when the song is transposed.
+
+Use **Chords → Chord detection** to switch between Detailed mode, which shows
+every recognized chord-quality change, and Steady mode, which keeps the first
+chord quality until the root changes. The selected mode can be changed while a
+song is loaded; playback position and chord corrections are preserved.
 
 ## Run
 

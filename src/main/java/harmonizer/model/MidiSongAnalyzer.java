@@ -56,8 +56,9 @@ final class MidiSongAnalyzer {
 		NavigableMap<Long, Chord> chords = new TreeMap<>();
 		List<Long> chordTicks = new ArrayList<>();
 		SongMetadata metadata = readMetadata(tracks);
+		ResolvedKey key = resolveKey(sequence, metadata);
 
-		collectChords(tracks, chords, metadata.flatKey(), mode);
+		collectChords(tracks, chords, key.flat(), mode);
 		chordOverrides.forEach((tick, name) -> {
 			Chord chord = chords.get(tick);
 			if (chord != null) {
@@ -81,8 +82,56 @@ final class MidiSongAnalyzer {
 				metadata.name(),
 				metadata.tempo(),
 				metadata.timeSignature(),
-				metadata.keySignature(),
-				metadata.flatKey());
+				key.name(),
+				key.flat(),
+				key.estimated());
+	}
+
+	// A declared key fitting worse than this is treated as unreliable (e.g. a default C major).
+	private static final double POOR_FIT = 0.5;
+	// An estimate must fit at least this well before it overrides a declared key.
+	private static final double CONFIDENT_FIT = 0.7;
+	// The relative major/minor must fit this much better before the mode is switched.
+	private static final double MODE_MARGIN = 0.1;
+
+	/**
+	 * Picks the key to show. The file's key signature is trusted when it fits the notes;
+	 * otherwise (missing, or a poor fit such as a default C major) the key is estimated with
+	 * {@link KeyDetector}. Key signatures don't distinguish a major key from its relative minor,
+	 * so the better-fitting of the two is used.
+	 */
+	private static ResolvedKey resolveKey(Sequence sequence, SongMetadata metadata) {
+		double[] histogram = KeyDetector.pitchClassDurations(sequence);
+		var estimate = KeyDetector.detect(histogram);
+		if (metadata.keyAccidentals() == null) {
+			return estimate
+					.map(found -> new ResolvedKey(found.name(), found.flat(), true))
+					.orElse(new ResolvedKey("Unknown", false, false));
+		}
+		ResolvedKey declared = new ResolvedKey(metadata.keySignature(), metadata.flatKey(), false);
+		if (estimate.isEmpty()) {
+			return declared;
+		}
+		int accidentals = metadata.keyAccidentals();
+		boolean minor = metadata.keyMinor();
+		int majorTonic = Math.floorMod(7 * accidentals, 12);
+		int tonic = minor ? (majorTonic + 9) % 12 : majorTonic;
+		double declaredScore = KeyDetector.score(histogram, tonic, minor);
+
+		int relativeTonic = minor ? majorTonic : (majorTonic + 9) % 12;
+		double relativeScore = KeyDetector.score(histogram, relativeTonic, !minor);
+		if (relativeScore > declaredScore + MODE_MARGIN) {
+			String[] names = minor ? MAJOR_KEYS : MINOR_KEYS;
+			String name = names[accidentals + 7] + (minor ? " major" : " minor");
+			declared = new ResolvedKey(name, accidentals < 0, true);
+			declaredScore = relativeScore;
+		}
+
+		KeyDetector.Key found = estimate.get();
+		if (declaredScore < POOR_FIT && found.score() >= CONFIDENT_FIT) {
+			return new ResolvedKey(found.name(), found.flat(), true);
+		}
+		return declared;
 	}
 
 	static Sequence copySequence(Sequence source) throws InvalidMidiDataException {
@@ -98,12 +147,56 @@ final class MidiSongAnalyzer {
 		return copy;
 	}
 
+	/**
+	 * Returns a copy of {@code source} with every pitched note moved by {@code semitones}.
+	 * Drums (channel 10) are left alone, notes pushed outside the MIDI range are dropped,
+	 * and key signatures are rewritten so the displayed key and chord spelling follow along.
+	 */
+	static Sequence transposeSequence(Sequence source, int semitones) throws InvalidMidiDataException {
+		Sequence copy = copySequence(source);
+		if (semitones == 0) {
+			return copy;
+		}
+		for (Track track : copy.getTracks()) {
+			for (int index = track.size() - 1; index >= 0; index--) {
+				MidiEvent event = track.get(index);
+				if (event.getMessage() instanceof ShortMessage message) {
+					int command = message.getCommand();
+					boolean pitched = command == ShortMessage.NOTE_ON || command == ShortMessage.NOTE_OFF
+							|| command == ShortMessage.POLY_PRESSURE;
+					if (!pitched || message.getChannel() == 9) {
+						continue;
+					}
+					int pitch = message.getData1() + semitones;
+					if (pitch < 0 || pitch > 127) {
+						track.remove(event);
+					} else {
+						message.setMessage(command, message.getChannel(), pitch, message.getData2());
+					}
+				} else if (event.getMessage() instanceof MetaMessage message
+						&& message.getType() == META_KEY_SIGNATURE && message.getData().length >= 2) {
+					byte[] data = message.getData().clone();
+					// Each semitone up adds 7 sharps (mod 12); pick the spelling with fewest accidentals.
+					int accidentals = Math.floorMod(data[0] + 7 * semitones, 12);
+					if (accidentals > 6) {
+						accidentals -= 12;
+					}
+					data[0] = (byte) accidentals;
+					message.setMessage(META_KEY_SIGNATURE, data, data.length);
+				}
+			}
+		}
+		return copy;
+	}
+
 	private static SongMetadata readMetadata(Track[] tracks) {
 		String name = null;
 		String keySignature = "Unknown";
 		String timeSignature = null;
 		int tempo = 0;
 		boolean flatKey = false;
+		Integer keyAccidentals = null;
+		boolean keyMinor = false;
 		boolean analyzed = false;
 
 		for (Track track : tracks) {
@@ -126,6 +219,8 @@ final class MidiSongAnalyzer {
 								String[] keys = mode == 0 ? MAJOR_KEYS : MINOR_KEYS;
 								keySignature = keys[accidentals + 7] + (mode == 0 ? " major" : " minor");
 								flatKey = accidentals < 0;
+								keyAccidentals = accidentals;
+								keyMinor = mode == 1;
 							}
 						}
 					}
@@ -135,7 +230,8 @@ final class MidiSongAnalyzer {
 			}
 		}
 
-		return new SongMetadata(name, tempo, timeSignature, keySignature, flatKey, analyzed);
+		return new SongMetadata(name, tempo, timeSignature, keySignature, flatKey,
+				keyAccidentals, keyMinor, analyzed);
 	}
 
 	private static int parseTempo(byte[] data, int fallback) {
@@ -288,7 +384,8 @@ final class MidiSongAnalyzer {
 			int tempo,
 			String timeSignature,
 			String keySignature,
-			boolean flatKey) {
+			boolean flatKey,
+			boolean keyEstimated) {
 	}
 
 	private record SongMetadata(
@@ -297,6 +394,11 @@ final class MidiSongAnalyzer {
 			String timeSignature,
 			String keySignature,
 			boolean flatKey,
+			Integer keyAccidentals,
+			boolean keyMinor,
 			boolean analyzed) {
+	}
+
+	private record ResolvedKey(String name, boolean flat, boolean estimated) {
 	}
 }

@@ -3,7 +3,9 @@ package harmonizer.ui;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
+import javafx.scene.control.ContextMenu;
 import javafx.scene.control.Label;
+import javafx.scene.control.MenuItem;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
@@ -18,7 +20,7 @@ public final class ChordDisplay {
 
 	public ChordDisplay() {
 		view.setAlignment(Pos.CENTER);
-		view.setPadding(new Insets(30, 12, 30, 12));
+		view.setPadding(new Insets(12));
 		view.getStyleClass().add("chord-display");
 		view.getChildren().addAll(createCard("CURRENT CHORD", currentChord, true),
 				createCard("UP NEXT", nextChord, false));
@@ -35,6 +37,14 @@ public final class ChordDisplay {
 		card.getStyleClass().add(primary ? "current-card" : "next-card");
 		HBox.setHgrow(card, Priority.ALWAYS);
 		return card;
+	}
+
+	/** Adds a right-click "Correct chord name…" shortcut on the chord cards. */
+	public void setOnCorrectChordName(Runnable action) {
+		MenuItem correct = new MenuItem("Correct chord name…");
+		correct.setOnAction(event -> action.run());
+		ContextMenu menu = new ContextMenu(correct);
+		view.setOnContextMenuRequested(event -> menu.show(view, event.getScreenX(), event.getScreenY()));
 	}
 
 	public Node getView() {

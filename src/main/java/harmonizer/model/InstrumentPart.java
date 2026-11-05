@@ -3,15 +3,12 @@ package harmonizer.model;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.Deque;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.NavigableMap;
-import java.util.Set;
-import java.util.TreeMap;
-import java.util.TreeSet;
 
 import javax.sound.midi.MetaMessage;
 import javax.sound.midi.MidiEvent;
@@ -39,7 +36,7 @@ public final class InstrumentPart {
 			"Synth Brass 2", "Soprano Sax", "Alto Sax", "Tenor Sax", "Baritone Sax", "Oboe",
 			"English Horn", "Bassoon", "Clarinet", "Piccolo", "Flute", "Recorder", "Pan Flute",
 			"Blown Bottle", "Shakuhachi", "Whistle", "Ocarina", "Lead 1 (square)",
-			"Lead 2 (sawtooth)", "Lead 3 (calliope)", "Lead 4 ( chiff)", "Lead 5 (charang)",
+			"Lead 2 (sawtooth)", "Lead 3 (calliope)", "Lead 4 (chiff)", "Lead 5 (charang)",
 			"Lead 6 (voice)", "Lead 7 (fifths)", "Lead 8 (bass + lead)", "Pad 1 (new age)",
 			"Pad 2 (warm)", "Pad 3 (polysynth)", "Pad 4 (choir)", "Pad 5 (bowed)",
 			"Pad 6 (metallic)", "Pad 7 (halo)", "Pad 8 (sweep)", "FX 1 (rain)", "FX 2 (soundtrack)",
@@ -55,20 +52,47 @@ public final class InstrumentPart {
 	};
 
 	private final String name;
-	private final NavigableMap<Long, List<Integer>> notesByTick;
+	private final List<NoteSpan> notes;
+	private final int lowestPitch;
+	private final int highestPitch;
+	private final boolean percussion;
 
-	private InstrumentPart(String name, NavigableMap<Long, List<Integer>> notesByTick) {
+	private InstrumentPart(String name, List<NoteSpan> notes, boolean percussion) {
 		this.name = name;
-		this.notesByTick = notesByTick;
+		this.percussion = percussion;
+		this.notes = List.copyOf(notes);
+		lowestPitch = notes.stream().mapToInt(NoteSpan::pitch).min().orElse(0);
+		highestPitch = notes.stream().mapToInt(NoteSpan::pitch).max().orElse(0);
 	}
 
 	public String getName() {
 		return name;
 	}
 
+	public List<NoteSpan> getNotes() {
+		return notes;
+	}
+
 	public List<Integer> getNotesAt(long tick) {
-		Map.Entry<Long, List<Integer>> entry = notesByTick.floorEntry(tick);
-		return entry == null ? List.of() : entry.getValue();
+		return notes.stream()
+				.filter(note -> note.startTick() <= tick && tick < note.endTick())
+				.map(NoteSpan::pitch)
+				.distinct()
+				.sorted()
+				.toList();
+	}
+
+	public int getLowestPitch() {
+		return lowestPitch;
+	}
+
+	public int getHighestPitch() {
+		return highestPitch;
+	}
+
+	/** True for General MIDI channel 10, where pitches select drum sounds rather than notes. */
+	public boolean isPercussion() {
+		return percussion;
 	}
 
 	public static String formatNote(int pitch) {
@@ -78,59 +102,63 @@ public final class InstrumentPart {
 	static List<InstrumentPart> fromSequence(Sequence sequence) {
 		List<InstrumentPart> parts = new ArrayList<>();
 		Track[] tracks = sequence.getTracks();
-		for (int trackIndex = 0; trackIndex < tracks.length; trackIndex++) {
-			Track track = tracks[trackIndex];
+		for (Track track : tracks) {
 			String trackName = readTrackName(track);
 			Map<Integer, Integer> programs = new HashMap<>();
-			Map<Integer, Deque<PartBuilder>> noteOwners = new HashMap<>();
+			Map<Integer, Deque<ActiveNote>> activeNotes = new HashMap<>();
 			Map<PartKey, PartBuilder> builders = new LinkedHashMap<>();
-			int eventIndex = 0;
-			while (eventIndex < track.size()) {
-				long tick = track.get(eventIndex).getTick();
-				Set<PartBuilder> changedAtTick = new TreeSet<>((left, right) ->
-						Integer.compare(left.order, right.order));
-				while (eventIndex < track.size() && track.get(eventIndex).getTick() == tick) {
-					MidiEvent event = track.get(eventIndex++);
-					if (!(event.getMessage() instanceof ShortMessage message)) {
-						continue;
-					}
-					int channel = message.getChannel();
-					if (message.getCommand() == ShortMessage.PROGRAM_CHANGE) {
-						programs.put(channel, message.getData1());
-						continue;
-					}
-					int command = message.getCommand();
-					if (command != ShortMessage.NOTE_ON && command != ShortMessage.NOTE_OFF) {
-						continue;
-					}
-					int pitch = message.getData1();
-					int ownerKey = channel * 128 + pitch;
-					if (command == ShortMessage.NOTE_ON && message.getData2() > 0) {
-						int program = programs.getOrDefault(channel, 0);
-						PartKey key = new PartKey(channel, program);
-						PartBuilder builder = builders.computeIfAbsent(key,
-								ignored -> new PartBuilder(parts.size() + builders.size(),
-										buildPartName(trackName, channel, program)));
-						noteOwners.computeIfAbsent(ownerKey, ignored -> new ArrayDeque<>()).addLast(builder);
-						builder.changeNote(pitch, 1);
-						changedAtTick.add(builder);
-					} else {
-						Deque<PartBuilder> owners = noteOwners.get(ownerKey);
-						if (owners != null && !owners.isEmpty()) {
-							PartBuilder builder = owners.removeFirst();
-							builder.changeNote(pitch, -1);
-							changedAtTick.add(builder);
-							if (owners.isEmpty()) {
-								noteOwners.remove(ownerKey);
-							}
-						}
-					}
+
+			for (int index = 0; index < track.size(); index++) {
+				MidiEvent event = track.get(index);
+				if (!(event.getMessage() instanceof ShortMessage message)) {
+					continue;
 				}
-				changedAtTick.forEach(builder -> builder.saveState(tick));
+				int channel = message.getChannel();
+				if (message.getCommand() == ShortMessage.PROGRAM_CHANGE) {
+					programs.put(channel, message.getData1());
+					continue;
+				}
+				if (message.getCommand() != ShortMessage.NOTE_ON
+						&& message.getCommand() != ShortMessage.NOTE_OFF) {
+					continue;
+				}
+
+				int pitch = message.getData1();
+				int noteKey = channel * 128 + pitch;
+				if (message.getCommand() == ShortMessage.NOTE_ON && message.getData2() > 0) {
+					int program = programs.getOrDefault(channel, 0);
+					PartKey key = new PartKey(channel, program);
+					PartBuilder builder = builders.computeIfAbsent(key,
+							ignored -> new PartBuilder(buildPartName(trackName, channel, program),
+									channel == 9));
+					activeNotes.computeIfAbsent(noteKey, ignored -> new ArrayDeque<>())
+							.addLast(new ActiveNote(builder, pitch, event.getTick()));
+					continue;
+				}
+
+				Deque<ActiveNote> notesForPitch = activeNotes.get(noteKey);
+				if (notesForPitch == null || notesForPitch.isEmpty()) {
+					continue;
+				}
+				ActiveNote active = notesForPitch.removeFirst();
+				active.builder().notes.add(new NoteSpan(pitch, active.startTick(), event.getTick()));
+				if (notesForPitch.isEmpty()) {
+					activeNotes.remove(noteKey);
+				}
 			}
+
+			long trackEnd = track.ticks();
+			activeNotes.values().stream()
+					.flatMap(Deque::stream)
+					.forEach(active -> active.builder().notes.add(
+							new NoteSpan(active.pitch(), active.startTick(), trackEnd)));
 			builders.values().stream()
-					.filter(builder -> builder.hasNoteEvents)
-					.forEach(builder -> parts.add(new InstrumentPart(builder.name, builder.notesByTick)));
+					.filter(builder -> !builder.notes.isEmpty())
+					.forEach(builder -> {
+						builder.notes.sort(Comparator.comparingLong(NoteSpan::startTick)
+								.thenComparingInt(NoteSpan::pitch));
+						parts.add(new InstrumentPart(builder.name, builder.notes, builder.percussion));
+					});
 		}
 		return List.copyOf(parts);
 	}
@@ -151,34 +179,23 @@ public final class InstrumentPart {
 		return partName + " (Ch. " + (channel + 1) + ")";
 	}
 
+	public record NoteSpan(int pitch, long startTick, long endTick) {
+	}
+
 	private record PartKey(int channel, int program) {
 	}
 
+	private record ActiveNote(PartBuilder builder, int pitch, long startTick) {
+	}
+
 	private static final class PartBuilder {
-		private final int order;
 		private final String name;
-		private final Map<Integer, Integer> activeNotes = new HashMap<>();
-		private final NavigableMap<Long, List<Integer>> notesByTick = new TreeMap<>();
-		private boolean hasNoteEvents;
+		private final boolean percussion;
+		private final List<NoteSpan> notes = new ArrayList<>();
 
-		private PartBuilder(int order, String name) {
-			this.order = order;
+		private PartBuilder(String name, boolean percussion) {
 			this.name = name;
-		}
-
-		private void changeNote(int pitch, int change) {
-			hasNoteEvents = true;
-			int count = activeNotes.getOrDefault(pitch, 0) + change;
-			if (count <= 0) {
-				activeNotes.remove(pitch);
-			} else {
-				activeNotes.put(pitch, count);
-			}
-		}
-
-		private void saveState(long tick) {
-			List<Integer> pitches = activeNotes.keySet().stream().sorted().toList();
-			notesByTick.put(tick, pitches);
+			this.percussion = percussion;
 		}
 	}
 }

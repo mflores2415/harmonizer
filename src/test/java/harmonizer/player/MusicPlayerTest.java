@@ -55,6 +55,28 @@ class MusicPlayerTest {
 		}
 	}
 
+	@Test
+	void speedIsClampedAndKeptWhenTheSequenceChanges() throws Exception {
+		MusicPlayback player;
+		try {
+			player = new MusicPlayer();
+		} catch (IllegalStateException exception) {
+			assumeTrue(false, "MIDI sequencer is not available in this environment");
+			return;
+		}
+		try {
+			player.setSpeed(0.5);
+			player.setSequence(new Sequence(Sequence.PPQ, 480));
+			assertEquals(0.5, player.getSpeed(), 1e-9);
+			player.setSpeed(10);
+			assertEquals(MusicPlayer.MAX_SPEED, player.getSpeed(), 1e-9);
+			player.setSpeed(0);
+			assertEquals(MusicPlayer.MIN_SPEED, player.getSpeed(), 1e-9);
+		} finally {
+			player.close();
+		}
+	}
+
 	private void addLyric(javax.sound.midi.Track track, String text, long tick) throws Exception {
 		byte[] data = text.getBytes(StandardCharsets.UTF_8);
 		MetaMessage lyric = new MetaMessage();

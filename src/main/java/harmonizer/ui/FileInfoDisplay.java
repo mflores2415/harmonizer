@@ -1,14 +1,15 @@
 package harmonizer.ui;
 
 import harmonizer.model.Song;
-import javafx.geometry.HPos;
-import javafx.geometry.Insets;
+import javafx.geometry.Pos;
 import javafx.scene.Node;
 import javafx.scene.control.Label;
-import javafx.scene.layout.GridPane;
+import javafx.scene.control.Tooltip;
+import javafx.scene.layout.FlowPane;
+import javafx.scene.layout.HBox;
 
 public final class FileInfoDisplay {
-	private final GridPane view = new GridPane();
+	private final FlowPane view = new FlowPane(18, 6);
 	private final Label fileName = new Label("-");
 	private final Label songName = new Label("-");
 	private final Label timeSignature = new Label("-");
@@ -16,22 +17,24 @@ public final class FileInfoDisplay {
 	private final Label tempo = new Label("-");
 
 	public FileInfoDisplay() {
-		view.setHgap(16);
-		view.setVgap(8);
-		view.setPadding(new Insets(12));
-		addRow(0, "File", fileName);
-		addRow(1, "Song", songName);
-		addRow(2, "Time signature", timeSignature);
-		addRow(3, "Key", key);
-		addRow(4, "Tempo", tempo);
+		view.setAlignment(Pos.CENTER_LEFT);
+		view.getStyleClass().add("song-details");
+		view.setMinWidth(0);
+		view.setPrefWrapLength(520);
+		addItem("Key", key);
+		addItem("Time", timeSignature);
+		addItem("Tempo", tempo);
+		addItem("Song", songName);
+		addItem("File", fileName);
 	}
 
-	private void addRow(int row, String title, Label value) {
-		Label heading = new Label(title);
+	private void addItem(String title, Label value) {
+		Label heading = new Label(title.toUpperCase());
 		heading.getStyleClass().add("info-heading");
-		view.add(heading, 0, row);
-		view.add(value, 1, row);
-		GridPane.setHalignment(value, HPos.RIGHT);
+		value.getStyleClass().add("info-value");
+		HBox item = new HBox(6, heading, value);
+		item.setAlignment(Pos.BASELINE_LEFT);
+		view.getChildren().add(item);
 	}
 
 	public Node getView() {
@@ -42,7 +45,16 @@ public final class FileInfoDisplay {
 		fileName.setText(song.getFileName());
 		songName.setText(valueOrDash(song.getName()));
 		timeSignature.setText(valueOrDash(song.getTimeSignature()));
-		key.setText(valueOrDash(song.getKey()));
+		var grid = song.getBarGrid();
+		timeSignature.setTooltip(grid.isAssumed()
+				? new Tooltip("This file has no time signature, so 4/4 is assumed\n"
+						+ "(the MIDI standard's default).")
+				: grid.getSections().size() > 1 ? new Tooltip(grid.describeChanges()) : null);
+		key.setText(valueOrDash(song.getKey()) + (song.isKeyEstimated() ? " (estimated)" : ""));
+		key.setTooltip(song.isKeyEstimated()
+				? new Tooltip("This file has no key, or its key doesn't match the notes,\n"
+						+ "so the key was estimated from the notes that are played.")
+				: null);
 		tempo.setText(song.getTempo() > 0 ? song.getTempo() + " BPM" : "-");
 	}
 

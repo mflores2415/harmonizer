@@ -29,6 +29,14 @@ public interface MusicPlayback extends AutoCloseable {
 
 	void seekToMicroseconds(long position);
 
+	/**
+	 * Sets the playback speed as a multiple of the song's own tempo (0.5 = half speed).
+	 * Pitch is unaffected and the sequence itself is not changed.
+	 */
+	void setSpeed(double speed);
+
+	double getSpeed();
+
 	@Override
 	void close();
 }

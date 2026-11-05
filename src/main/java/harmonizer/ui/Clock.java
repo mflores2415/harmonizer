@@ -40,7 +40,7 @@ public final class Clock {
 
 		HBox controls = new HBox(12, elapsedTime, timeline, totalTime);
 		controls.setAlignment(Pos.CENTER);
-		controls.setPadding(new Insets(8, 12, 8, 12));
+		controls.setPadding(new Insets(0, 0, 0, 12));
 		HBox.setHgrow(timeline, javafx.scene.layout.Priority.ALWAYS);
 		view.setCenter(controls);
 		view.getStyleClass().add("timeline");
