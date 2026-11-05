@@ -6,9 +6,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.TreeSet;
 
+import harmonizer.midi.GeneralMidi;
+import harmonizer.midi.PlayedNote;
 import harmonizer.model.BarGrid;
 import harmonizer.model.InstrumentPart;
-import harmonizer.model.InstrumentPart.NoteSpan;
+import harmonizer.model.Pitch;
 import javafx.animation.AnimationTimer;
 import javafx.geometry.Pos;
 import javafx.geometry.VPos;
@@ -67,18 +69,6 @@ public final class NoteRollDisplay {
 	private static final Font LABEL_FONT = Font.font("Segoe UI", FontWeight.BOLD, 11);
 	private static final Font EMPTY_FONT = Font.font("Segoe UI", 14);
 
-	private static final String[] GM_DRUMS = {
-			"Acoustic Bass Drum", "Bass Drum", "Side Stick", "Acoustic Snare", "Hand Clap",
-			"Electric Snare", "Low Floor Tom", "Closed Hi-Hat", "High Floor Tom", "Pedal Hi-Hat",
-			"Low Tom", "Open Hi-Hat", "Low-Mid Tom", "Hi-Mid Tom", "Crash Cymbal 1", "High Tom",
-			"Ride Cymbal 1", "Chinese Cymbal", "Ride Bell", "Tambourine", "Splash Cymbal",
-			"Cowbell", "Crash Cymbal 2", "Vibraslap", "Ride Cymbal 2", "Hi Bongo", "Low Bongo",
-			"Mute Hi Conga", "Open Hi Conga", "Low Conga", "High Timbale", "Low Timbale",
-			"High Agogo", "Low Agogo", "Cabasa", "Maracas", "Short Whistle", "Long Whistle",
-			"Short Guiro", "Long Guiro", "Claves", "Hi Wood Block", "Low Wood Block",
-			"Mute Cuica", "Open Cuica", "Mute Triangle", "Open Triangle"
-	};
-	private static final int FIRST_GM_DRUM = 35;
 
 	private final VBox view = new VBox(10);
 	private final ComboBox<InstrumentPart> partPicker = new ComboBox<>();
@@ -304,7 +294,7 @@ public final class NoteRollDisplay {
 				g.setFill(BLACK_KEY_ROW);
 				g.fillRect(rollLeft, y, rollWidth, rowHeight);
 			}
-			if (percussion || Math.floorMod(pitch, 12) == 0) {
+			if (percussion || Pitch.pitchClass(pitch) == 0) {
 				g.setStroke(percussion ? GRID_BEAT : GRID_OCTAVE);
 				g.setLineWidth(1);
 				double lineY = Math.floor(y + rowHeight) + 0.5;
@@ -347,7 +337,7 @@ public final class NoteRollDisplay {
 		g.setFont(LABEL_FONT);
 		// Drum note lengths are arbitrary in MIDI, so hits are drawn as short fixed strikes.
 		long hitTicks = Math.max(1, resolution / 4);
-		for (NoteSpan note : selectedPart.getNotes()) {
+		for (PlayedNote note : selectedPart.getNotes()) {
 			long endTick = percussion ? note.startTick() + hitTicks : note.endTick();
 			boolean isSounding = note.startTick() <= tick && tick < endTick;
 			if (isSounding) {
@@ -379,7 +369,7 @@ public final class NoteRollDisplay {
 			if (!percussion && noteWidth >= 34 && rowHeight >= 14) {
 				g.setFill(TEXT_DARK);
 				g.setTextAlign(TextAlignment.LEFT);
-				g.fillText(InstrumentPart.formatNote(note.pitch()), x1 + 4, y + noteHeight / 2);
+				g.fillText(Pitch.withOctave(note.pitch()), x1 + 4, y + noteHeight / 2);
 			}
 		}
 
@@ -419,13 +409,13 @@ public final class NoteRollDisplay {
 			g.fillRect(0, y, keyWidth, rowHeight);
 			g.setStroke(KEY_BORDER);
 			g.strokeRect(0.5, Math.floor(y) + 0.5, keyWidth - 1, rowHeight);
-			boolean octave = Math.floorMod(pitch, 12) == 0;
+			boolean octave = Pitch.pitchClass(pitch) == 0;
 			boolean labelled = lit || octave || rowHeight >= 16 && !black;
 			if (labelled && (rowHeight >= 9 || octave && rowHeight >= 5)) {
 				g.setFont(rowHeight >= 12 ? LABEL_FONT : SMALL_FONT);
 				g.setFill(lit ? TEXT_DARK : black ? WHITE_KEY : TEXT_MUTED);
 				g.setTextAlign(TextAlignment.RIGHT);
-				g.fillText(InstrumentPart.formatNote(pitch), axisWidth - 6, y + rowHeight / 2);
+				g.fillText(Pitch.withOctave(pitch), axisWidth - 6, y + rowHeight / 2);
 			}
 		}
 		g.setStroke(GRID_BAR);
@@ -445,7 +435,7 @@ public final class NoteRollDisplay {
 			g.fillRect(0, y, axisWidth, rowHeight);
 			if (rowHeight >= 9) {
 				g.setFill(lit ? TEXT_DARK : TEXT_MUTED);
-				g.fillText(drumName(pitch), 8, y + rowHeight / 2, axisWidth - 12);
+				g.fillText(GeneralMidi.drumName(pitch), 8, y + rowHeight / 2, axisWidth - 12);
 			}
 		}
 		g.setStroke(GRID_BAR);
@@ -468,7 +458,7 @@ public final class NoteRollDisplay {
 		boolean percussion = selectedPart != null && selectedPart.isPercussion();
 		List<Node> chips = new ArrayList<>();
 		for (int pitch : pitches) {
-			Label chip = new Label(percussion ? drumName(pitch) : InstrumentPart.formatNote(pitch));
+			Label chip = new Label(percussion ? GeneralMidi.drumName(pitch) : Pitch.withOctave(pitch));
 			chip.getStyleClass().add("note-chip");
 			chips.add(chip);
 		}
@@ -480,13 +470,8 @@ public final class NoteRollDisplay {
 		nowPlaying.getChildren().setAll(chips);
 	}
 
-	static String drumName(int pitch) {
-		int index = pitch - FIRST_GM_DRUM;
-		return index >= 0 && index < GM_DRUMS.length ? GM_DRUMS[index] : "Drum " + pitch;
-	}
-
 	private static boolean isBlackKey(int pitch) {
-		return switch (Math.floorMod(pitch, 12)) {
+		return switch (Pitch.pitchClass(pitch)) {
 			case 1, 3, 6, 8, 10 -> true;
 			default -> false;
 		};

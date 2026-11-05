@@ -1,15 +1,12 @@
 package harmonizer.model;
 
-import java.util.ArrayDeque;
-import java.util.Deque;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.List;
 import java.util.Optional;
 
-import javax.sound.midi.MidiEvent;
 import javax.sound.midi.Sequence;
-import javax.sound.midi.ShortMessage;
-import javax.sound.midi.Track;
+
+import harmonizer.midi.NoteReader;
+import harmonizer.midi.PlayedNote;
 
 /**
  * Estimates a song's key with the Krumhansl–Schmuckler key-finding algorithm: build a
@@ -30,7 +27,6 @@ public final class KeyDetector {
 	private static final String[] MINOR_NAMES = {
 			"C", "C#", "D", "Eb", "E", "F", "F#", "G", "G#", "A", "Bb", "B"
 	};
-	private static final int DRUM_CHANNEL = 9;
 
 	private KeyDetector() {
 	}
@@ -51,7 +47,7 @@ public final class KeyDetector {
 
 	/** Estimates the key from the song's pitched notes, or empty if it has none. */
 	public static Optional<Key> detect(Sequence sequence) {
-		return detect(pitchClassDurations(sequence));
+		return detect(pitchClassDurations(NoteReader.read(sequence)));
 	}
 
 	static Optional<Key> detect(double[] histogram) {
@@ -80,33 +76,12 @@ public final class KeyDetector {
 	}
 
 	/** Total ticks each pitch class sounds, summed over all non-drum notes. */
-	static double[] pitchClassDurations(Sequence sequence) {
+	static double[] pitchClassDurations(List<PlayedNote> notes) {
 		double[] durations = new double[12];
-		for (Track track : sequence.getTracks()) {
-			Map<Integer, Deque<Long>> started = new HashMap<>();
-			for (int index = 0; index < track.size(); index++) {
-				MidiEvent event = track.get(index);
-				if (!(event.getMessage() instanceof ShortMessage message)
-						|| message.getChannel() == DRUM_CHANNEL) {
-					continue;
-				}
-				int command = message.getCommand();
-				if (command != ShortMessage.NOTE_ON && command != ShortMessage.NOTE_OFF) {
-					continue;
-				}
-				int key = message.getChannel() * 128 + message.getData1();
-				if (command == ShortMessage.NOTE_ON && message.getData2() > 0) {
-					started.computeIfAbsent(key, ignored -> new ArrayDeque<>()).addLast(event.getTick());
-				} else {
-					Deque<Long> starts = started.get(key);
-					if (starts != null && !starts.isEmpty()) {
-						durations[message.getData1() % 12] += event.getTick() - starts.removeFirst();
-					}
-				}
+		for (PlayedNote note : notes) {
+			if (!note.isDrum()) {
+				durations[Pitch.pitchClass(note.pitch())] += note.duration();
 			}
-			long end = track.ticks();
-			started.forEach((key, starts) -> starts.forEach(
-					start -> durations[(key % 128) % 12] += end - start));
 		}
 		return durations;
 	}

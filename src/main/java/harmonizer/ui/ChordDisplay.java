@@ -1,5 +1,7 @@
 package harmonizer.ui;
 
+import harmonizer.midi.ChordLyrics;
+import harmonizer.midi.ChordPair;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
@@ -10,13 +12,13 @@ import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
 
+/** The "Current chord" and "Up next" cards. */
 public final class ChordDisplay {
+	private static final String NONE = "—";
+
 	private final HBox view = new HBox(18);
-	private final Label currentChord = new Label("—");
-	private final Label nextChord = new Label("—");
-	private String current = "—";
-	private String next = "—";
-	private long tick;
+	private final Label currentChord = new Label(NONE);
+	private final Label nextChord = new Label(NONE);
 
 	public ChordDisplay() {
 		view.setAlignment(Pos.CENTER);
@@ -33,8 +35,7 @@ public final class ChordDisplay {
 		VBox card = new VBox(12, title, chord);
 		card.setAlignment(Pos.CENTER);
 		card.setPadding(new Insets(28));
-		card.getStyleClass().add("chord-card");
-		card.getStyleClass().add(primary ? "current-card" : "next-card");
+		card.getStyleClass().addAll("chord-card", primary ? "current-card" : "next-card");
 		HBox.setHgrow(card, Priority.ALWAYS);
 		return card;
 	}
@@ -51,29 +52,13 @@ public final class ChordDisplay {
 		return view;
 	}
 
-	public String getChords() {
-		return current + " " + next;
-	}
-
-	public long getTick() {
-		return tick;
-	}
-
-	public void set(String chordText, long chordTick) {
-		String[] pair = chordText.split(" ", 2);
-		current = pair[0];
-		next = pair.length > 1 ? pair[1] : "";
-		tick = chordTick;
-		currentChord.setText(current);
-		nextChord.setText(next);
+	public void show(ChordPair chords) {
+		currentChord.setText(chords.current());
+		nextChord.setText(ChordLyrics.END.equals(chords.next()) ? NONE : chords.next());
 	}
 
 	public void showEmptyState() {
-		current = "—";
-		next = "—";
-		tick = 0;
-		currentChord.setText(current);
-		nextChord.setText(next);
+		currentChord.setText(NONE);
+		nextChord.setText(NONE);
 	}
-
 }

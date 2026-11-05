@@ -1,11 +1,9 @@
 package harmonizer.player;
 
-import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import java.util.NavigableMap;
 import java.util.TreeMap;
 import java.util.function.Consumer;
-import java.util.regex.Pattern;
 
 import javax.sound.midi.InvalidMidiDataException;
 import javax.sound.midi.MetaEventListener;
@@ -16,20 +14,20 @@ import javax.sound.midi.Sequence;
 import javax.sound.midi.Sequencer;
 import javax.sound.midi.Track;
 
-public final class MusicPlayer implements MusicPlayback, MetaEventListener {
-	private static final int META_LYRIC = 5;
-	private static final long REWIND_INTERVAL_MICROSECONDS = 10_000_000L;
-	private static final Pattern CHORD_LYRIC = Pattern.compile(
-			"[A-G](?:#|b)?(?:maj|min|aug|dim|rr)(?:\\((?:m7|M7)\\))? "
-					+ "(?:[A-G](?:#|b)?(?:maj|min|aug|dim|rr)(?:\\((?:m7|M7)\\))?|END)");
+import harmonizer.midi.ChordLyrics;
+import harmonizer.midi.ChordPair;
+import harmonizer.midi.Midi;
 
+/** Plays a sequence through the Java sound system and reports progress and the current chords. */
+public final class MusicPlayer implements MusicPlayback, MetaEventListener {
 	public static final double MIN_SPEED = 0.1;
 	public static final double MAX_SPEED = 2.0;
+	private static final long REWIND_INTERVAL_MICROSECONDS = 10_000_000L;
 
 	private final Sequencer sequencer;
-	private double speed = 1.0;
-	private final NavigableMap<Long, String> chordLyrics = new TreeMap<>();
+	private final NavigableMap<Long, ChordPair> chordLyrics = new TreeMap<>();
 	private Sequence sequence;
+	private double speed = 1.0;
 	private Consumer<PlaybackUpdate> listener = update -> { };
 
 	public MusicPlayer() {
@@ -53,24 +51,26 @@ public final class MusicPlayer implements MusicPlayback, MetaEventListener {
 		this.sequence = sequence;
 		sequencer.setSequence(sequence);
 		sequencer.setLoopCount(0);
-		chordLyrics.clear();
-		for (Track track : sequence.getTracks()) {
-			for (int index = 0; index < track.size(); index++) {
-				if (track.get(index).getMessage() instanceof MetaMessage message
-						&& message.getType() == META_LYRIC) {
-					String lyric = new String(message.getData(), StandardCharsets.UTF_8);
-					if (CHORD_LYRIC.matcher(lyric).matches()) {
-						chordLyrics.put(track.get(index).getTick(), lyric);
-					}
-				}
-			}
-		}
+		readChordLyrics(sequence);
 		if (!sequencer.isOpen()) {
 			sequencer.open();
 		}
 		sequencer.setTempoFactor((float) speed);
 		sequencer.setMicrosecondPosition(0);
 		notifyListener();
+	}
+
+	private void readChordLyrics(Sequence sequence) {
+		chordLyrics.clear();
+		for (Track track : sequence.getTracks()) {
+			for (int index = 0; index < track.size(); index++) {
+				long tick = track.get(index).getTick();
+				if (track.get(index).getMessage() instanceof MetaMessage message
+						&& message.getType() == Midi.META_LYRIC) {
+					ChordLyrics.parse(Midi.text(message)).ifPresent(chords -> chordLyrics.put(tick, chords));
+				}
+			}
+		}
 	}
 
 	@Override
@@ -91,7 +91,7 @@ public final class MusicPlayer implements MusicPlayback, MetaEventListener {
 	@Override
 	public PlaybackUpdate getPlaybackUpdate() {
 		long tick = sequence == null ? 0 : sequencer.getTickPosition();
-		Map.Entry<Long, String> lyric = chordLyrics.floorEntry(tick);
+		Map.Entry<Long, ChordPair> lyric = chordLyrics.floorEntry(tick);
 		return new PlaybackUpdate(
 				getPositionMicroseconds(),
 				getDurationMicroseconds(),
@@ -141,14 +141,13 @@ public final class MusicPlayer implements MusicPlayback, MetaEventListener {
 		if (sequence == null) {
 			return;
 		}
-		long boundedPosition = Math.max(0, Math.min(position, getDurationMicroseconds()));
-		sequencer.setMicrosecondPosition(boundedPosition);
+		sequencer.setMicrosecondPosition(Math.clamp(position, 0, getDurationMicroseconds()));
 		notifyListener();
 	}
 
 	@Override
 	public void setSpeed(double speed) {
-		this.speed = Math.max(MIN_SPEED, Math.min(MAX_SPEED, speed));
+		this.speed = Math.clamp(speed, MIN_SPEED, MAX_SPEED);
 		sequencer.setTempoFactor((float) this.speed);
 		notifyListener();
 	}
@@ -167,7 +166,7 @@ public final class MusicPlayer implements MusicPlayback, MetaEventListener {
 
 	@Override
 	public void meta(MetaMessage message) {
-		if (message.getType() == META_LYRIC) {
+		if (message.getType() == Midi.META_LYRIC) {
 			notifyListener();
 		}
 	}

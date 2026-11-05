@@ -1,6 +1,7 @@
 package harmonizer.ui;
 
 import harmonizer.model.Song;
+import harmonizer.model.SongKey;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
 import javafx.scene.control.Label;
@@ -41,7 +42,7 @@ public final class FileInfoDisplay {
 		return view;
 	}
 
-	public void set(Song song) {
+	public void show(Song song) {
 		fileName.setText(song.getFileName());
 		songName.setText(valueOrDash(song.getName()));
 		timeSignature.setText(valueOrDash(song.getTimeSignature()));
@@ -50,8 +51,9 @@ public final class FileInfoDisplay {
 				? new Tooltip("This file has no time signature, so 4/4 is assumed\n"
 						+ "(the MIDI standard's default).")
 				: grid.getSections().size() > 1 ? new Tooltip(grid.describeChanges()) : null);
-		key.setText(valueOrDash(song.getKey()) + (song.isKeyEstimated() ? " (estimated)" : ""));
-		key.setTooltip(song.isKeyEstimated()
+		SongKey songKey = song.getKey();
+		key.setText(valueOrDash(songKey.name()) + (songKey.estimated() ? " (estimated)" : ""));
+		key.setTooltip(songKey.estimated()
 				? new Tooltip("This file has no key, or its key doesn't match the notes,\n"
 						+ "so the key was estimated from the notes that are played.")
 				: null);

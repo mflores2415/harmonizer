@@ -48,17 +48,17 @@ class KeyDetectorTest {
 
 	@Test
 	void estimatesKeyWhenFileHasNone() throws Exception {
-		Song song = new Song(write("no-key.mid", song(G_MAJOR_CHORDS, G_MAJOR_MELODY, null)));
-		assertEquals("G major", song.getKey());
-		assertTrue(song.isKeyEstimated());
+		Song song = Song.load(write("no-key.mid", song(G_MAJOR_CHORDS, G_MAJOR_MELODY, null)));
+		assertEquals("G major", song.getKey().name());
+		assertTrue(song.getKey().estimated());
 	}
 
 	@Test
 	void keepsDeclaredKeyThatFits() throws Exception {
 		// One sharp, major = G major.
-		Song song = new Song(write("g-key.mid", song(G_MAJOR_CHORDS, G_MAJOR_MELODY, new byte[] {1, 0})));
-		assertEquals("G major", song.getKey());
-		assertFalse(song.isKeyEstimated());
+		Song song = Song.load(write("g-key.mid", song(G_MAJOR_CHORDS, G_MAJOR_MELODY, new byte[] {1, 0})));
+		assertEquals("G major", song.getKey().name());
+		assertFalse(song.getKey().estimated());
 	}
 
 	@Test
@@ -66,17 +66,17 @@ class KeyDetectorTest {
 		// E major (four sharps) labelled with a default C major signature.
 		int[][] chords = {{52, 56, 59}, {57, 61, 64}, {59, 63, 66}, {52, 56, 59}};
 		int[] melody = {64, 66, 68, 69, 71, 73, 75, 76};
-		Song song = new Song(write("bogus-c.mid", song(chords, melody, new byte[] {0, 0})));
-		assertEquals("E major", song.getKey());
-		assertTrue(song.isKeyEstimated());
+		Song song = Song.load(write("bogus-c.mid", song(chords, melody, new byte[] {0, 0})));
+		assertEquals("E major", song.getKey().name());
+		assertTrue(song.getKey().estimated());
 	}
 
 	@Test
 	void switchesToRelativeMinorWhenItFitsBetter() throws Exception {
 		// A minor music labelled as C major: same signature, wrong mode.
-		Song song = new Song(write("relative.mid", song(A_MINOR_CHORDS, A_MINOR_MELODY, new byte[] {0, 0})));
-		assertEquals("A minor", song.getKey());
-		assertTrue(song.isKeyEstimated());
+		Song song = Song.load(write("relative.mid", song(A_MINOR_CHORDS, A_MINOR_MELODY, new byte[] {0, 0})));
+		assertEquals("A minor", song.getKey().name());
+		assertTrue(song.getKey().estimated());
 	}
 
 	private static Sequence song(int[][] chords, int[] melody, byte[] keySignature) throws Exception {

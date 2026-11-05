@@ -15,13 +15,25 @@ Karaoke MIDI files and playing them back alongside the chord display.
 mvn test
 ```
 
-## Source layout
+## Project layout
 
-- `model` contains notes, chords, and song state; `MidiSongAnalyzer` imports MIDI,
-  reads metadata, identifies chords, and writes the generated chord lyrics.
-- `player` contains MIDI playback.
-- `ui` contains JavaFX windows, controls, and displays.
-- `controller` connects user actions to the model and player.
+- `samples/` – example MIDI and karaoke songs to open in the app (the file
+  chooser starts here). `SampleSongsTest` loads each of them.
+- `src/main/java/harmonizer/`
+  - `midi` – MIDI plumbing with no musical decisions: event constants, reading
+    notes (`NoteReader`), General MIDI names, and the chord-lyric format
+    Harmonizer writes into files (`ChordLyrics`).
+  - `model` – the song and its analysis. `Song` is the entry point;
+    `MidiSongAnalyzer` coordinates `SongMetadata`, `KeyResolver`/`KeyDetector`,
+    `ChordDetector` and the instrument parts. `BarGrid` maps ticks to bars and
+    `Transposer` moves the notes.
+  - `player` – playback behind the `MusicPlayback` interface.
+  - `ui` – JavaFX views and dialogs. They show state and report what the user
+    asks for; they don't change the song themselves.
+  - `controller` – carries out user requests on the song and the player.
+- `files/` – course documents (use cases, storyboard), a General MIDI
+  instrument list in `reference/`, and the original 2016 MIDI prototype in
+  `legacy/`.
 
 The playback controls include play/pause, restart, a 10-second rewind, and a
 timeline that can be clicked or dragged to seek through a MIDI file.

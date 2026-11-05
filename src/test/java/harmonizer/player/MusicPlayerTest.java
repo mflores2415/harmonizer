@@ -6,6 +6,8 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 import java.nio.charset.StandardCharsets;
 
+import harmonizer.midi.ChordLyrics;
+
 import javax.sound.midi.MidiEvent;
 import javax.sound.midi.MetaMessage;
 import javax.sound.midi.Sequence;
@@ -40,10 +42,10 @@ class MusicPlayerTest {
 
 			player.seekToMicroseconds(500_000);
 			assertTrue(Math.abs(player.getPositionMicroseconds() - 500_000) < 100_000);
-			assertEquals("Cmaj Gmaj", player.getPlaybackUpdate().chordText());
+			assertEquals("Cmaj Gmaj", ChordLyrics.format(player.getPlaybackUpdate().chords()));
 
 			player.seekToMicroseconds(1_500_000);
-			assertEquals("Gmaj END", player.getPlaybackUpdate().chordText());
+			assertEquals("Gmaj END", ChordLyrics.format(player.getPlaybackUpdate().chords()));
 
 			player.seekToMicroseconds(-1);
 			assertTrue(player.getPositionMicroseconds() < 100_000);

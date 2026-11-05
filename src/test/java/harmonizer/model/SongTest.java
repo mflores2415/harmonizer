@@ -1,8 +1,5 @@
-package harmonizer;
+package harmonizer.model;
 
-import harmonizer.model.Song;
-import harmonizer.model.ChordAnalysisMode;
-import harmonizer.model.InstrumentPart;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -22,7 +19,7 @@ import javax.sound.midi.ShortMessage;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
-class SongMidiTest {
+class SongTest {
 	@TempDir
 	Path tempDir;
 
@@ -30,9 +27,9 @@ class SongMidiTest {
 	void importsMidiFromDirectoryWithoutTrailingSeparator() throws Exception {
 		Path midiFile = createChordMidi("chord.mid");
 
-		Song song = new Song(midiFile);
+		Song song = Song.load(midiFile);
 
-		assertTrue(song.getMap().values().stream().anyMatch(chord -> chord.getName().equals("Cmaj")));
+		assertTrue(song.getChordsByTick().values().stream().anyMatch(chord -> chord.getName().equals("Cmaj")));
 		assertEquals(-1, song.getNextTick(song.getFirstTick()));
 		assertTrue(hasLyric(song.getSequence(), song.getFirstTick(), "Cmaj END"));
 	}
@@ -46,9 +43,9 @@ class SongMidiTest {
 		addTriad(track, 60, 64, 67, 0, 480);
 		MidiSystem.write(sequence, 1, karaokeFile.toFile());
 
-		Song song = new Song(karaokeFile);
+		Song song = Song.load(karaokeFile);
 
-		assertTrue(song.getMap().values().stream().anyMatch(chord -> chord.getName().equals("Cmaj")));
+		assertTrue(song.getChordsByTick().values().stream().anyMatch(chord -> chord.getName().equals("Cmaj")));
 		assertTrue(hasLyric(song.getSequence(), 0, "Hello world"));
 		assertTrue(hasLyric(song.getSequence(), song.getFirstTick(), "Cmaj END"));
 	}
@@ -56,13 +53,13 @@ class SongMidiTest {
 	@Test
 	void editingChordUpdatesModelAndMidiLyric() throws Exception {
 		Path midiFile = createChordMidi("editable-chord.mid");
-		Song song = new Song(midiFile);
-		long chordTick = song.getMap().keySet().iterator().next();
+		Song song = Song.load(midiFile);
+		long chordTick = song.getChordsByTick().keySet().iterator().next();
 
-		song.editChord(chordTick, "Dmaj END", "Cmaj END", -1, "", "");
+		song.renameChord(chordTick, "Dmaj");
 
-		assertEquals("Dmaj", song.getMap().get(chordTick).getName());
-		assertTrue(song.getChords().stream().anyMatch(chord -> chord.getName().equals("Dmaj")));
+		assertEquals("Dmaj", song.getChordsByTick().get(chordTick).getName());
+		assertTrue(song.getUniqueChords().stream().anyMatch(chord -> chord.getName().equals("Dmaj")));
 		assertTrue(hasLyric(song.getSequence(), chordTick, "Dmaj END"));
 	}
 
@@ -73,9 +70,9 @@ class SongMidiTest {
 		sequence.createTrack();
 		MidiSystem.write(sequence, 1, midiFile.toFile());
 
-		Song song = new Song(midiFile);
+		Song song = Song.load(midiFile);
 
-		assertTrue(song.getMap().isEmpty());
+		assertTrue(song.getChordsByTick().isEmpty());
 		assertEquals(-1, song.getFirstTick());
 		assertEquals(-1, song.getChordTickAt(0));
 		assertEquals(-1, song.getPrevTick(0));
@@ -84,15 +81,15 @@ class SongMidiTest {
 
 	@Test
 	void chordMapCannotBeModifiedOutsideSong() throws Exception {
-		Song song = new Song(createChordMidi("read-only-chords.mid"));
-		var chord = song.getMap().values().iterator().next();
+		Song song = Song.load(createChordMidi("read-only-chords.mid"));
+		var chord = song.getChordsByTick().values().iterator().next();
 
-		assertThrows(UnsupportedOperationException.class, () -> song.getMap().put(100L, chord));
+		assertThrows(UnsupportedOperationException.class, () -> song.getChordsByTick().put(100L, chord));
 	}
 
 	@Test
 	void chordNavigationHandlesTicksOutsideTheSong() throws Exception {
-		Song song = new Song(createChordMidi("chord-navigation.mid"));
+		Song song = Song.load(createChordMidi("chord-navigation.mid"));
 		long firstTick = song.getFirstTick();
 
 		assertEquals(firstTick, song.getChordTickAt(firstTick - 1));
@@ -117,14 +114,14 @@ class SongMidiTest {
 		addNote(track, ShortMessage.NOTE_OFF, 68, 0, 480);
 		MidiSystem.write(sequence, 1, midiFile.toFile());
 
-		Song song = new Song(midiFile);
+		Song song = Song.load(midiFile);
 
 		assertEquals("Metadata Test", song.getName());
 		assertEquals(120, song.getTempo());
 		assertEquals("4 / 4", song.getTimeSignature());
-		assertEquals("Db major", song.getKey());
-		assertTrue(song.isFlatKey());
-		assertTrue(song.getMap().values().stream().anyMatch(chord -> chord.getName().equals("Dbmaj")));
+		assertEquals("Db major", song.getKey().name());
+		assertTrue(song.getKey().flat());
+		assertTrue(song.getChordsByTick().values().stream().anyMatch(chord -> chord.getName().equals("Dbmaj")));
 		assertTrue(hasLyric(song.getSequence(), song.getFirstTick(), "Dbmaj END"));
 	}
 
@@ -137,12 +134,12 @@ class SongMidiTest {
 		addTriad(track, 62, 65, 69, 480, 960);
 		MidiSystem.write(sequence, 1, midiFile.toFile());
 
-		Song song = new Song(midiFile);
+		Song song = Song.load(midiFile);
 		long firstChordTick = song.getFirstTick();
 		long secondChordTick = song.getNextTick(firstChordTick);
 
-		assertEquals("Cmaj", song.getMap().get(firstChordTick).getName());
-		assertEquals("Dmin", song.getMap().get(secondChordTick).getName());
+		assertEquals("Cmaj", song.getChordsByTick().get(firstChordTick).getName());
+		assertEquals("Dmin", song.getChordsByTick().get(secondChordTick).getName());
 		assertTrue(hasLyric(song.getSequence(), firstChordTick, "Cmaj Dmin"));
 		assertTrue(hasLyric(song.getSequence(), secondChordTick, "Dmin END"));
 	}
@@ -151,41 +148,41 @@ class SongMidiTest {
 	void steadyModeKeepsTheFirstQualityUntilTheRootChanges() throws Exception {
 		Path midiFile = createSameRootQualityChangeMidi();
 
-		Song detailed = new Song(midiFile, ChordAnalysisMode.DETAILED);
-		Song steady = new Song(midiFile, ChordAnalysisMode.STEADY);
+		Song detailed = Song.load(midiFile, ChordAnalysisMode.DETAILED);
+		Song steady = Song.load(midiFile, ChordAnalysisMode.STEADY);
 
-		assertEquals(2, detailed.getMap().size());
-		assertEquals("Cmaj", detailed.getMap().values().iterator().next().getName());
-		assertEquals("Cmin", detailed.getMap().values().stream().skip(1).findFirst().orElseThrow().getName());
-		assertEquals(1, steady.getMap().size());
-		assertEquals("Cmaj", steady.getMap().values().iterator().next().getName());
+		assertEquals(2, detailed.getChordsByTick().size());
+		assertEquals("Cmaj", detailed.getChordsByTick().values().iterator().next().getName());
+		assertEquals("Cmin", detailed.getChordsByTick().values().stream().skip(1).findFirst().orElseThrow().getName());
+		assertEquals(1, steady.getChordsByTick().size());
+		assertEquals("Cmaj", steady.getChordsByTick().values().iterator().next().getName());
 		assertTrue(hasLyric(steady.getSequence(), steady.getFirstTick(), "Cmaj END"));
 	}
 
 	@Test
 	void switchingAnalysisModeKeepsChordEdits() throws Exception {
-		Song song = new Song(createSameRootQualityChangeMidi(), ChordAnalysisMode.DETAILED);
+		Song song = Song.load(createSameRootQualityChangeMidi(), ChordAnalysisMode.DETAILED);
 		long tick = song.getFirstTick();
 
-		song.editChord(tick, "Dmaj Cmin", "Cmaj Cmin", -1, "", "");
+		song.renameChord(tick, "Dmaj");
 		song.setAnalysisMode(ChordAnalysisMode.STEADY);
-		assertEquals("Dmaj", song.getMap().get(tick).getName());
+		assertEquals("Dmaj", song.getChordsByTick().get(tick).getName());
 		assertTrue(hasLyric(song.getSequence(), tick, "Dmaj END"));
 
 		song.setAnalysisMode(ChordAnalysisMode.DETAILED);
-		assertEquals("Dmaj", song.getMap().get(tick).getName());
+		assertEquals("Dmaj", song.getChordsByTick().get(tick).getName());
 	}
 
 	@Test
 	void steadyModeRemovesGeneratedLyricsForFilteredChordChanges() throws Exception {
-		Song detailed = new Song(createSameRootQualityChangeMidi(), ChordAnalysisMode.DETAILED);
+		Song detailed = Song.load(createSameRootQualityChangeMidi(), ChordAnalysisMode.DETAILED);
 		long filteredChordTick = detailed.getNextTick(detailed.getFirstTick());
 		Path analyzedFile = tempDir.resolve("analyzed-chords.mid");
 		MidiSystem.write(detailed.getSequence(), 1, analyzedFile.toFile());
 
-		Song steady = new Song(analyzedFile, ChordAnalysisMode.STEADY);
+		Song steady = Song.load(analyzedFile, ChordAnalysisMode.STEADY);
 
-		assertEquals(1, steady.getMap().size());
+		assertEquals(1, steady.getChordsByTick().size());
 		assertTrue(hasLyric(steady.getSequence(), steady.getFirstTick(), "Cmaj END"));
 		assertFalse(hasLyric(steady.getSequence(), filteredChordTick, "Cmin END"));
 	}
@@ -204,11 +201,11 @@ class SongMidiTest {
 		addNote(secondTrack, ShortMessage.NOTE_OFF, 67, 0, 960);
 		MidiSystem.write(sequence, 1, midiFile.toFile());
 
-		Song song = new Song(midiFile);
+		Song song = Song.load(midiFile);
 
-		assertEquals(1, song.getMap().size());
-		assertEquals("Cmaj", song.getMap().values().iterator().next().getName());
-		assertEquals(0, song.getMap().keySet().iterator().next());
+		assertEquals(1, song.getChordsByTick().size());
+		assertEquals("Cmaj", song.getChordsByTick().values().iterator().next().getName());
+		assertEquals(0, song.getChordsByTick().keySet().iterator().next());
 	}
 
 	@Test
@@ -223,7 +220,7 @@ class SongMidiTest {
 		addTriad(track, 60, 64, 67, 0, 480);
 		MidiSystem.write(sequence, 1, midiFile.toFile());
 
-		Song song = new Song(midiFile);
+		Song song = Song.load(midiFile);
 
 		assertEquals(1, song.getInstrumentParts().size());
 		InstrumentPart trumpet = song.getInstrumentParts().get(0);
@@ -233,7 +230,7 @@ class SongMidiTest {
 		assertEquals(List.of(), trumpet.getNotesAt(480));
 		assertTrue(trumpet.getNotes().stream()
 				.allMatch(note -> note.startTick() == 0 && note.endTick() == 480));
-		assertEquals("C4", InstrumentPart.formatNote(60));
+		assertEquals("C4", Pitch.withOctave(60));
 	}
 
 	@Test
@@ -251,17 +248,17 @@ class SongMidiTest {
 		track.add(new MidiEvent(drumOff, 120));
 		MidiSystem.write(sequence, 1, midiFile.toFile());
 
-		Song song = new Song(midiFile);
+		Song song = Song.load(midiFile);
 		long chordTick = song.getFirstTick();
-		song.editChord(chordTick, "Amin END", "Cmaj END", -1, "", "");
+		song.renameChord(chordTick, "Amin");
 		assertEquals(1, song.getCorrectedChordCount());
 
 		song.setTranspose(2);
 
 		assertEquals(2, song.getTranspose());
-		assertEquals("D major", song.getKey());
+		assertEquals("D major", song.getKey().name());
 		assertEquals(0, song.getCorrectedChordCount());
-		assertEquals("Dmaj", song.getMap().get(song.getFirstTick()).getName());
+		assertEquals("Dmaj", song.getChordsByTick().get(song.getFirstTick()).getName());
 		InstrumentPart pitched = song.getInstrumentParts().stream()
 				.filter(part -> !part.isPercussion()).findFirst().orElseThrow();
 		InstrumentPart drums = song.getInstrumentParts().stream()
@@ -270,12 +267,12 @@ class SongMidiTest {
 		assertEquals(List.of(38), drums.getNotesAt(0));
 
 		song.setTranspose(-1);
-		assertEquals("B major", song.getKey());
-		assertEquals("Bmaj", song.getMap().get(song.getFirstTick()).getName());
+		assertEquals("B major", song.getKey().name());
+		assertEquals("Bmaj", song.getChordsByTick().get(song.getFirstTick()).getName());
 
 		song.setTranspose(0);
-		assertEquals("C major", song.getKey());
-		assertEquals("Cmaj", song.getMap().get(song.getFirstTick()).getName());
+		assertEquals("C major", song.getKey().name());
+		assertEquals("Cmaj", song.getChordsByTick().get(song.getFirstTick()).getName());
 	}
 
 	private Path createChordMidi(String fileName) throws Exception {

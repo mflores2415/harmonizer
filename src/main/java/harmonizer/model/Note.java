@@ -1,33 +1,37 @@
 package harmonizer.model;
 
-public class Note {
-	private static final String[] PITCH_CLASS_NAMES = {
-			"C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"
-	};
+/**
+ * A note reduced to its pitch class: two notes are equal when they have the same name,
+ * whatever their octave, which is what chord recognition needs.
+ */
+public final class Note {
 	private final int pitch;
 	private final int relativePitch;
-	
+
 	public Note(int pitch) {
 		this.pitch = pitch;
-		this.relativePitch = Math.floorMod(pitch, 12);
+		this.relativePitch = Pitch.pitchClass(pitch);
 	}
+
 	public String getName() {
-		return PITCH_CLASS_NAMES[relativePitch];
+		return Pitch.name(relativePitch, false);
 	}
+
 	public int getPitch() {
-		return this.pitch;
+		return pitch;
 	}
-	
+
 	public int getRelativePitch() {
-		return this.relativePitch;
+		return relativePitch;
 	}
+
 	@Override
 	public boolean equals(Object obj) {
-		return obj instanceof Note other && this.relativePitch == other.relativePitch;
+		return obj instanceof Note other && relativePitch == other.relativePitch;
 	}
 
 	@Override
 	public int hashCode() {
-		return this.relativePitch;
+		return relativePitch;
 	}
- }
+}

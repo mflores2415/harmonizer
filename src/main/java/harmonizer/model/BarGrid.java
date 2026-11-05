@@ -9,13 +9,13 @@ import javax.sound.midi.MidiEvent;
 import javax.sound.midi.Sequence;
 import javax.sound.midi.Track;
 
+import harmonizer.midi.Midi;
+
 /**
  * Maps MIDI ticks to bars and beats using the song's time signatures, including changes
  * mid-song. When a file has no time signature, 4/4 is assumed, as the MIDI standard specifies.
  */
 public final class BarGrid {
-	private static final int META_TIME_SIGNATURE = 0x58;
-
 	/** A time signature taking effect at {@code tick}, which starts bar {@code firstBar}. */
 	public record Section(long tick, int numerator, int denominator, int firstBar, long unitTicks) {
 		/** Compound meters (6/8, 9/8, 12/8…) are felt in dotted-quarter beats of three units. */
@@ -57,7 +57,7 @@ public final class BarGrid {
 			for (int index = 0; index < track.size(); index++) {
 				MidiEvent event = track.get(index);
 				if (event.getMessage() instanceof MetaMessage message
-						&& message.getType() == META_TIME_SIGNATURE && message.getData().length >= 2) {
+						&& message.getType() == Midi.META_TIME_SIGNATURE && message.getData().length >= 2) {
 					int numerator = Byte.toUnsignedInt(message.getData()[0]);
 					int exponent = Byte.toUnsignedInt(message.getData()[1]);
 					if (numerator > 0 && exponent <= 6) {

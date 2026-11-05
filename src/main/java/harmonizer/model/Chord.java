@@ -1,15 +1,16 @@
 package harmonizer.model;
 
+import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 
+/** A chord recognized from a set of sounding notes, named like "Cmaj" or "Amin(m7)". */
 public final class Chord {
-	private static final String[] SHARP_ROOTS = {
-			"C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"
-	};
-	private static final String[] FLAT_ROOTS = {
-			"C", "Db", "D", "Eb", "E", "F", "Gb", "G", "Ab", "A", "Bb", "B"
-	};
+	/** Quality suffixes, in the order they are offered when correcting a chord name. */
+	public static final List<String> QUALITY_NAMES = List.of(
+			"maj", "min", "aug", "dim", "maj(m7)", "maj(M7)", "min(m7)", "min(M7)");
+	// Name given to note sets that match no chord.
+	private static final String UNRECOGNIZED = "Err";
 	private static final ChordQuality[] QUALITIES = {
 			new ChordQuality("maj", new int[] { 0, 4, 7 }),
 			new ChordQuality("min", new int[] { 0, 3, 7 }),
@@ -27,25 +28,28 @@ public final class Chord {
 	private final int root;
 	private final Set<Note> notes;
 	private final boolean flatKey;
+	private final boolean recognized;
 
 	public Chord(Set<Note> notes, boolean flatKey) {
 		this.notes = Set.copyOf(notes);
 		this.flatKey = flatKey;
 		ChordMatch match = recognize(pitchMask(this.notes));
-		root = match == null ? 4 : match.root();
-		type = match == null ? "rr" : match.quality().name();
-		String[] roots = flatKey ? FLAT_ROOTS : SHARP_ROOTS;
-		name = roots[root] + type;
+		recognized = match != null;
+		root = recognized ? match.root() : 0;
+		type = recognized ? match.quality().name() : "";
+		name = recognized ? Pitch.name(root, flatKey) + type : UNRECOGNIZED;
 	}
 
 	private Chord(Chord chord, String name) {
 		notes = chord.notes;
 		flatKey = chord.flatKey;
+		recognized = chord.recognized;
 		root = chord.root;
 		type = chord.type;
 		this.name = name;
 	}
 
+	/** The same chord under a corrected name. */
 	public Chord withName(String name) {
 		return new Chord(this, name);
 	}
@@ -86,6 +90,11 @@ public final class Chord {
 
 	public String getName() {
 		return name;
+	}
+
+	/** False when the notes match no known chord. */
+	public boolean isRecognized() {
+		return recognized;
 	}
 
 	public int getRootPitchClass() {
