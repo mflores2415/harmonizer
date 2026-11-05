@@ -114,10 +114,12 @@ git push origin v1.0.0
     they don't change the song themselves.
   - `controller` – carries out user requests on the song and the player.
 - `src/test/java/` – unit tests mirroring the packages, plus `SampleSongsTest`, which
-  analyzes every file in `samples/`.
-- `samples/` – MIDI files for trying the app and for tests. `ode-to-joy.mid` and
-  `greensleeves.mid` are public-domain tunes arranged for this project and ship with the
-  app; the other files are third-party MIDI files used for testing.
+  analyzes real songs.
+- `samples/` – `ode-to-joy.mid` and `greensleeves.mid`, public-domain tunes arranged for
+  this project. They ship with the app and are always tested.
+- `local-samples/` (git-ignored, optional) – put any other MIDI files here for local
+  testing. `SampleSongsTest` checks the ones it knows about when they're present and
+  skips them otherwise.
 - `scripts/package.sh` – builds the self-contained app with `jpackage`.
 - `files/` – the original course documents (use cases, storyboard), a General MIDI
   instrument list, and the 2016 MIDI prototype this project grew out of.

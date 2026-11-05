@@ -8,3 +8,6 @@ bin
 .settings
 .project
 .classpath
+
+# Third-party MIDI files kept locally for testing; not redistributable.
+/local-samples/
